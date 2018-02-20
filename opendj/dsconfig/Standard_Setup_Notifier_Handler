@@ -1,0 +1,100 @@
+################################################
+#	Copyright (c) 2015-18 zibernetics, Inc.
+#
+#	Licensed under the Apache License, Version 2.0 (the "License");
+#	you may not use this file except in compliance with the License.
+#	You may obtain a copy of the License at
+#	
+#	    http://www.apache.org/licenses/LICENSE-2.0
+#	
+#	Unless required by applicable law or agreed to in writing, software
+#	distributed under the License is distributed on an "AS IS" BASIS,
+#	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#	See the License for the specific language governing permissions and
+#	limitations under the License.
+#
+################################################
+
+# This command creates a notifier handler
+
+for xInstanceName in ${localNotifierHandlerList}; do
+    xInstanceSettings=${OPENDJ_NOTIFIER_HANDLER[$xInstanceName]}
+    [ -z "${xInstanceSettings}" ] && continue
+    IFS=',' read -ra xInstanceArr <<< "${xInstanceSettings}"
+
+    setDirectives=
+    sHandlerName=Standard_Notifier_Handler-${xInstanceName}
+    sHandlerNameQ="'Standard_Notifier_Handler-${xInstanceName}'"
+
+    notifierType=
+
+    for g in "${xInstanceArr[@]}"; do
+        key=${g%%=*}
+        value=${g#*=}
+
+        case "$key" in
+            handler-name)
+                [[ "${value}" != "${value% *}" ]] && \
+                sHandlerNameQ="'${value}'" || \
+                sHandlerNameQ="${value}"
+
+                sHandlerName="${value}"
+                ;;
+            type)
+                notifierType="${value}"
+                ;;
+            *)
+                [[ "${value}" != "${value% *}" ]] && \
+                setDirectives="${setDirectives} --set ${key}:'${value}'" || \
+                setDirectives="${setDirectives} --set ${key}:${value}"
+                ;;
+        esac
+    done
+
+    if [ ! -z "${notifierType}" ]; then
+        existingProps=$(${OPENDJ_HOME_DIR}/bin/dsconfig dsconfig get-account-status-notification-handler-prop \
+                            --hostname ${localTargetHost}                           \
+                            --port ${OPENDJ_ADMIN_PORT}                             \
+                            --bindDN "${localLDAPBindDN}"                           \
+                            --bindPassword ${localLDAPBindPW}                       \
+                            --handler-name "${sHandlerName}" -E --trustAll | grep -v -e "^Property" -e "^-" -e "does not exist")
+    [ -z "${existingProps}" ] && subOption=create-account-status-notification-handler || subOption=set-account-status-notification-handler-prop
+
+        tmpfile=$(mktemp /tmp/.XXXXXXXXXXXX)
+
+        echo
+        echo "#### ${xInstanceName} ==> ${subOption} - ${sHandlerName}"
+        cat <<- EOF > ${tmpfile}
+        ${OPENDJ_HOME_DIR}/bin/dsconfig ${subOption} \
+        --hostname ${localTargetHost}           \
+        --port ${OPENDJ_ADMIN_PORT}             \
+        --bindDN "${localLDAPBindDN}"           \
+        --bindPassword ${localLDAPBindPW}       \
+        --handler-name ${sHandlerNameQ}         \
+        --set enabled:true                      \
+        $([ "${subOption}" == "create-account-status-notification-handler" ] && echo "--type \"${notifierType}\"") \
+        $setDirectives                          \
+        --trustAll -X -n    
+		EOF
+
+        source ${tmpfile}
+        if [ $? -eq 0 ]; then
+            echo        
+            ${OPENDJ_HOME_DIR}/bin/dsconfig dsconfig get-account-status-notification-handler-prop \
+            --hostname ${localTargetHost}                   \
+            --port ${OPENDJ_ADMIN_PORT}                     \
+            --bindDN "${localLDAPBindDN}"                   \
+            --bindPassword ${localLDAPBindPW}               \
+            --handler-name "${sHandlerName}" -E --trustAll        
+
+            rm ${tmpfile}
+        else
+            echo "#### ERROR EXECUTING ${xInstanceName} ==> ${subOption} - ${sHandlerName}"
+            rm ${tmpfile}
+            return 1
+        fi
+    else
+        echo "#### ERROR no notifier type specified"
+        return 1
+    fi
+done

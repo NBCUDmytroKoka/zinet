@@ -1,0 +1,66 @@
+################################################
+#	Copyright (c) 2015-18 zibernetics, Inc.
+#
+#	Licensed under the Apache License, Version 2.0 (the "License");
+#	you may not use this file except in compliance with the License.
+#	You may obtain a copy of the License at
+#	
+#	    http://www.apache.org/licenses/LICENSE-2.0
+#	
+#	Unless required by applicable law or agreed to in writing, software
+#	distributed under the License is distributed on an "AS IS" BASIS,
+#	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#	See the License for the specific language governing permissions and
+#	limitations under the License.
+#
+################################################
+
+# This command sets backend index properties:
+#   index-name = name of the index
+#   index-type = https://backstage.forgerock.com/docs/opendj/3.5/admin-guide/chap-indexing#indexes-overview
+#   index-entry-limit = https://backstage.forgerock.com/docs/opendj/3.5/admin-guide/chap-indexing#index-entry-limits
+
+for xInstanceName in ${localBackendIdxList}; do
+    xInstanceSettings=${OPENDJ_BACKEND_IDX_CFG[$xInstanceName]}
+    [ -z "${xInstanceSettings}" ] && continue
+    IFS=',' read -ra xInstanceArr <<< "${xInstanceSettings}"
+
+    sIndexName=${g%%_*}
+    sBackendName=${g#*_}
+    iStartOpt=0
+
+    for g in "${xInstanceArr[@]}"; do
+        key=${g%%=*}
+        value=${g#*=}
+
+        case "$key" in
+            backend-name)
+                sBackendName="${value}"
+                ;;
+            index-name)
+                sIndexName="${value}"
+                ;;
+            start)
+                iStartOpt=${value}
+                ;;
+        esac
+    done
+
+    if [ ! -z "${sIndexName}" ]; then
+        baseDN=${OPENDJ_BASE_DNS[$sBackendName]}
+        
+        echo "#### Rebuilding index - ${sIndexName} ==> ${localTargetHost}"
+        ${OPENDJ_HOME_DIR}/bin/rebuild-index    \
+        --hostname ${localTargetHost}           \
+        --port ${OPENDJ_ADMIN_PORT}             \
+        --bindDN "${localLDAPBindDN}"           \
+        --bindPassword ${localLDAPBindPW}       \
+        --baseDN "${baseDN}"                    \
+        --index "${sIndexName}"                 \
+        --start ${iStartOpt}                    \
+        --trustAll
+    else
+        echo "#### Error: index name wasn't specified"
+    fi
+
+done

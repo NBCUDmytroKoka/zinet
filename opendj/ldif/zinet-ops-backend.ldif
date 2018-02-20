@@ -1,0 +1,123 @@
+################################################
+#	Copyright (c) 2015-18 zibernetics, Inc.
+#
+#	Licensed under the Apache License, Version 2.0 (the "License");
+#	you may not use this file except in compliance with the License.
+#	You may obtain a copy of the License at
+#	
+#	    http://www.apache.org/licenses/LICENSE-2.0
+#	
+#	Unless required by applicable law or agreed to in writing, software
+#	distributed under the License is distributed on an "AS IS" BASIS,
+#	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#	See the License for the specific language governing permissions and
+#	limitations under the License.
+#
+################################################
+
+############################################################
+#
+#	Schema for ${OPENDJ_BASE_OPS_DN}
+# 
+############################################################
+dn: ${OPENDJ_BASE_OPS_DN}
+objectClass: domain
+objectClass: top
+dc: $(echo "${OPENDJ_BASE_OPS_DN}" | awk -F, '{ print $1 }' | awk -F= '{ print $2 }')
+
+dn: ${OPENDJ_SVCS_OPS_DN}
+objectClass: top
+objectClass: organizationalUnit
+ou: $(echo "${OPENDJ_SVCS_OPS_DN}" | awk -F, '{ print $1 }' | awk -F= '{ print $2 }')
+
+dn: ${OPENDJ_GROUPS_OPS_DN}
+objectClass: organizationalunit
+objectClass: top
+ou: $(echo "${OPENDJ_GROUPS_OPS_DN}" | awk -F, '{ print $1 }' | awk -F= '{ print $2 }')
+
+dn: ${OPENDJ_APPS_OPS_DN}
+objectClass: top
+objectClass: organizationalUnit
+ou: $(echo "${OPENDJ_APPS_OPS_DN}" | awk -F, '{ print $1 }' | awk -F= '{ print $2 }')
+
+dn: uid=service_opendj,${OPENDJ_SVCS_OPS_DN}
+objectClass: top
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+objectClass: person
+cn: service_opendj
+sn: service_opendj
+uid: service_opendj
+$([ ! -z "${localSvcAcctPasswd}" ] && { echo "userPassword: ${localSvcAcctPasswd}"; })
+
+############################################################
+#	Group entries
+############################################################
+dn: cn=opendj_admins,${OPENDJ_GROUPS_OPS_DN}
+objectClass: top
+objectClass: groupofuniquenames
+cn: opendj_admins
+uniqueMember: uid=service_opendj,${OPENDJ_SVCS_OPS_DN}
+
+dn: cn=psearch_admins,${OPENDJ_GROUPS_OPS_DN}
+objectClass: top
+objectClass: groupofuniquenames
+cn: psearch_admins
+uniqueMember: uid=service_opendj,${OPENDJ_SVCS_OPS_DN}
+
+dn: cn=schema_admins,${OPENDJ_GROUPS_OPS_DN}
+objectClass: top
+objectClass: groupofuniquenames
+cn: schema_admins
+
+dn: cn=password_admins,${OPENDJ_GROUPS_OPS_DN}
+objectClass: top
+objectClass: groupofuniquenames
+cn: password_admins
+
+############################################################
+#	Admin privilege
+############################################################
+dn: cn=Administrator Privilege,${OPENDJ_BASE_DN}
+objectClass: collectiveAttributeSubentry
+objectClass: extensibleObject
+objectClass: subentry
+objectClass: top
+cn: Administrator Privilege
+ds-privilege-name;collective: config-read
+ds-privilege-name;collective: config-write
+ds-privilege-name;collective: ldif-import
+ds-privilege-name;collective: ldif-export
+ds-privilege-name;collective: modify-acl
+ds-privilege-name;collective: password-reset
+ds-privilege-name;collective: proxied-auth
+ds-privilege-name;collective: subentry-write
+ds-privilege-name;collective: update-schema
+ds-rlim-lookthrough-limit;collective: 0
+ds-rlim-size-limit;collective: 0
+ds-rlim-time-limit;collective: 0
+subtreeSpecification: {base "", specificationFilter
+  "(isMemberOf=cn=opendj_admins,${OPENDJ_GROUPS_OPS_DN})" }
+
+dn: cn=Schema Privilege,${OPENDJ_BASE_DN}
+objectClass: collectiveAttributeSubentry
+objectClass: extensibleObject
+objectClass: subentry
+objectClass: top
+cn: Schema Privilege
+ds-privilege-name;collective: modify-acl
+ds-privilege-name;collective: subentry-write
+ds-privilege-name;collective: update-schema
+subtreeSpecification: {base "", specificationFilter
+  "(isMemberOf=cn=schema_admins,${OPENDJ_GROUPS_OPS_DN})" }
+
+dn: cn=Password Privilege,${OPENDJ_BASE_DN}
+objectClass: collectiveAttributeSubentry
+objectClass: extensibleObject
+objectClass: subentry
+objectClass: top
+cn: Password Privilege
+ds-privilege-name;collective: password-reset
+subtreeSpecification: {base "", specificationFilter
+  "(isMemberOf=cn=password_admins,${OPENDJ_GROUPS_OPS_DN})" }
+

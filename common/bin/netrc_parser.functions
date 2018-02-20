@@ -1,0 +1,97 @@
+#!/bin/bash
+
+################################################
+#	Copyright (c) 2015-18 zibernetics, Inc.
+#
+#	Licensed under the Apache License, Version 2.0 (the "License");
+#	you may not use this file except in compliance with the License.
+#	You may obtain a copy of the License at
+#	
+#	    http://www.apache.org/licenses/LICENSE-2.0
+#	
+#	Unless required by applicable law or agreed to in writing, software
+#	distributed under the License is distributed on an "AS IS" BASIS,
+#	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#	See the License for the specific language governing permissions and
+#	limitations under the License.
+#
+################################################
+
+netrcGetValue()
+{
+    theFile=${1}
+    theKey=${2}
+    theMachine=${3}
+
+    if [ -z "${theMachine}" ]; then
+        grep "${theKey}" "${theFile}" 2>/dev/null | head -1 | cut -f 1 -d ' ' --complement    
+    else    
+        sed -n "
+            /^[ \t]*machine[ \t]\{1,\}$theMachine/ {
+                # we have matched the machine
+
+                : next
+                # next line
+                n
+
+                # print username, if matched
+                s/^[ \t]\{1,\}$theKey[ \t]\{1,\}//ip
+                t quit
+
+                # kill processing if another machine directive
+                s/^[ \t]\{1,\}machine[ \t]\{1,\}//i
+                t quit
+
+                # process next line of input
+                b next
+
+                # done processing
+                : quit
+                q
+            }" $theFile
+    fi
+}
+
+netrcGetMachines()
+{
+    theFile=${1}
+    grep -i "machine" "${theFile}" 2>/dev/null | sed 's/^[ \t]*machine[ \t]\{1,\}//i'
+}
+
+netrcGetLogin()
+{
+    theFile=${1}
+    theMachine=${2}
+    echo $(netrcGetValue "${theFile}" "login" "${theMachine}")
+}
+
+netrcGetPasswd()
+{
+    theFile=${1}
+    theMachine=${2}
+    echo $(netrcGetValue "${theFile}" "password" "${theMachine}")
+}
+
+netrcGetAccount()
+{
+    theFile=${1}
+    theMachine=${2}
+    echo $(netrcGetValue "${theFile}" "account" "${theMachine}")
+}
+
+netrc()
+{
+    theFile="$(pwd)/.netrc"
+    if [ ! -f "${theFile}" ]; then
+        theFile="${ziNetEtcDir}/.netrc"
+        if [ ! -f "${theFile}" ]; then
+            theFile=$(/bin/sh -c "echo ~/.netrc")
+            if [ ! -f "${theFile}" ]; then
+                touch "${theFile}" 2>/dev/null
+            fi
+        fi
+    fi
+    
+    echo "${theFile}"
+}
+

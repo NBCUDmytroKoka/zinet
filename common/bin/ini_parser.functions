@@ -1,0 +1,238 @@
+#!/bin/bash
+
+################################################
+#	Copyright (c) 2015-18 zibernetics, Inc.
+#
+#	Licensed under the Apache License, Version 2.0 (the "License");
+#	you may not use this file except in compliance with the License.
+#	You may obtain a copy of the License at
+#	
+#	    http://www.apache.org/licenses/LICENSE-2.0
+#	
+#	Unless required by applicable law or agreed to in writing, software
+#	distributed under the License is distributed on an "AS IS" BASIS,
+#	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#	See the License for the specific language governing permissions and
+#	limitations under the License.
+#
+################################################
+
+################################################
+#
+# based on http://theoldschooldevops.com/2008/02/09/bash-ini-parser/
+# https://github.com/albfan/bash-ini-parser/blob/master/bash-ini-parser
+#
+#################################################
+
+PREFIX="ini_section_"
+
+function debug_ini {
+   return #abort debug
+   echo $*
+   echo --start --
+   echo "${ini[*]}"
+   echo --end--
+   echo
+}
+
+function debug_item {
+   return #abort debug
+   echo $*
+   echo --start --
+   echo "${item[*]}"
+   echo --end--
+   echo
+}
+
+function ini_parser {
+   shopt -p extglob &> /dev/null
+   CHANGE_EXTGLOB=$?
+   if [ $CHANGE_EXTGLOB = 1 ]
+   then
+      shopt -s extglob
+   fi
+   ini="$(<$1)"                 # read the file
+   ini="${ini//[/\\[}"          # escape [
+   debug_ini "escape ["
+   ini="${ini//]/\\]}"          # escape ]
+   debug_ini "escape ["
+   IFS=$'\n' && ini=( ${ini} )  # convert to line-array
+   debug_ini "convert to line-array"
+   ini=( ${ini[*]//;*/} )       # remove comments with ;
+   debug_ini "remove comments with ;"
+   ini=( ${ini[*]/#+([[:space:]])/} ) # remove init whitespace
+   debug_ini "remove init whitespace"
+   ini=( ${ini[*]/*([[:space:]])=*([[:space:]])/=} ) # remove whitespace around =
+   debug_ini "whitespace around"
+   ini=( ${ini[*]/#\\[/\}$'\n'"$PREFIX"} ) # set section prefix
+   debug_ini "set section prefix"
+   ini=( ${ini[*]/%\\]/ \(} )   # convert text2function (1)
+   debug_ini "convert text2function (1)"
+   ini=( ${ini[*]/=/=\( } )     # convert item to array
+   debug_ini "convert item to array"
+   ini=( ${ini[*]/%/ \)} )      # close array parenthesis
+   debug_ini "close array parenthesis"
+   ini=( ${ini[*]/%\\ \)/ \\} ) # the multiline trick
+   debug_ini "the multiline trick"
+   ini=( ${ini[*]/%\( \)/\(\) \{} ) # convert text2function (2)
+   debug_ini "convert text2function (2)"
+   ini=( ${ini[*]/%\} \)/\}} )  # remove extra parenthesis
+   debug_ini "remove extra parenthesis"
+   ini=( ${ini[*]/%\{/\{$'\n''ini_unset ${FUNCNAME/#'$PREFIX'}'$'\n'} )  # clean previous definition of section 
+   debug_ini "clean previous definition of section"   
+   ini[0]=""                    # remove first element
+   debug_ini "remove first element"
+   ini[${#ini[*]} + 1]='}'      # add the last brace
+   debug_ini "add the last brace"
+   eval "$(echo "${ini[*]}")"   # eval the result
+   debug_ini "eval the result"
+   EVAL_STATUS=$?
+   if [ $CHANGE_EXTGLOB = 1 ]
+   then
+      shopt -u extglob
+   fi
+   return $EVAL_STATUS
+}
+
+function ini_writer {
+   SECTION=$1
+   OLDIFS="$IFS"
+   IFS=' '$'\n'
+   if [ -z "$SECTION" ] 
+   then
+      fun="$(declare -F)"
+   else
+      fun="$(declare -F $PREFIX$SECTION)"
+      if [ -z "$fun" ]
+      then
+         echo "section $SECTION not found" >2
+         exit 1
+      fi
+   fi
+   fun="${fun//declare -f/}"
+   for f in $fun; do
+      [ "${f#$PREFIX}" == "${f}" ] && continue
+      item="$(declare -f ${f})"
+      item="${item##*\{}" # remove function definition
+      item="${item##*FUNCNAME*$PREFIX\};}" # remove clear section
+      item="${item/\}}"  # remove function close
+      item="${item%)*}" # remove everything after parenthesis
+      item="${item});" # add close parenthesis
+      vars=""
+      while [ "$item" != "" ]
+      do
+         newvar="${item%%=*}" # get item name
+         vars="$vars $newvar" # add name to collection
+         item="${item#*;}" # remove readed line
+      done
+      eval $f
+      echo "[${f#$PREFIX}]" # output section
+      for var in $vars; do
+         eval 'local length=${#'$var'[*]}' # test if var is an array
+         if [ $length == 1 ]
+         then
+            echo $var="$([[ "${!var}" =~ \ |\' ]] && echo \")${!var}$([[ "${!var}" =~ \ |\' ]] && echo \")" #output var
+         else 
+            echo ";$var is an array" # add comment denoting var is an array
+            eval 'echo $var=\"${'$var'[*]}\"' # output array var
+         fi
+      done
+   done
+   IFS="$OLDIFS"
+}
+
+function ini_unset {
+   SECTION=$1
+   OLDIFS="$IFS"
+   IFS=' '$'\n'
+   if [ -z "$SECTION" ] 
+   then
+      fun="$(declare -F)"
+   else
+      fun="$(declare -F $PREFIX$SECTION)"
+      if [ -z "$fun" ]
+      then
+         echo "section $SECTION not found" >2
+         return
+      fi
+   fi
+   fun="${fun//declare -f/}"
+   for f in $fun; do
+      [ "${f#$PREFIX}" == "${f}" ] && continue
+      item="$(declare -f ${f})"
+      item="${item##*\{}" # remove function definition
+      item="${item##*FUNCNAME*$PREFIX\};}" # remove clear section
+      item="${item/\}}"  # remove function close
+      item="${item%)*}" # remove everything after parenthesis
+      item="${item});" # add close parenthesis
+      vars=""
+      while [ "$item" != "" ]
+      do
+         newvar="${item%%=*}" # get item name
+         vars="$vars $newvar" # add name to collection
+         item="${item#*;}" # remove readed line
+      done
+      for var in $vars; do
+         unset $var
+      done
+   done
+   IFS="$OLDIFS"
+}
+
+function ini_clear {
+   SECTION=$1
+   OLDIFS="$IFS"
+   IFS=' '$'\n'
+   if [ -z "$SECTION" ] 
+   then
+      fun="$(declare -F)"
+   else
+      fun="$(declare -F $PREFIX$SECTION)"
+      if [ -z "$fun" ]
+      then
+         echo "section $SECTION not found" >2
+         exit 1
+      fi
+   fi
+   fun="${fun//declare -f/}"
+   for f in $fun; do
+      [ "${f#$PREFIX}" == "${f}" ] && continue
+      unset -f ${f}
+   done
+   IFS="$OLDIFS"
+}
+
+function ini_update {
+
+    SECTION=$1
+    VAR=$2
+
+    OLDIFS="$IFS"
+    IFS=' '$'\n'
+    fun="$(declare -F $PREFIX$SECTION)"
+    if [ -z "$fun" ]; then
+        echo "section $SECTION not found" >2
+        exit 1
+    fi
+
+    item="$(declare -f ${fun})"
+    debug_item "declare fun function"
+    item="${item%\}}"  # remove function close
+    debug_item "remove function close"
+
+#     item="${item##*$VAR*;}" # remove the old entry
+    item=$( grep -v $VAR <<< "${item}" ) # remove the old entry
+    debug_item "remove the old entry"
+    item="${item}
+    $VAR=(${!VAR})
+    "
+    debug_item "Add new value"
+    item="${item}
+    }" # close function again
+    debug_item "close function again"
+   
+   eval "function $item" 
+}
+
+
+# vim: filetype=sh

@@ -1,0 +1,91 @@
+################################################
+#	Copyright (c) 2015-18 zibernetics, Inc.
+#
+#	Licensed under the Apache License, Version 2.0 (the "License");
+#	you may not use this file except in compliance with the License.
+#	You may obtain a copy of the License at
+#	
+#	    http://www.apache.org/licenses/LICENSE-2.0
+#	
+#	Unless required by applicable law or agreed to in writing, software
+#	distributed under the License is distributed on an "AS IS" BASIS,
+#	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#	See the License for the specific language governing permissions and
+#	limitations under the License.
+#
+################################################
+
+# This command creates a length validator
+
+for xInstanceName in ${localLenValidatorList}; do
+    xInstanceSettings=${OPENDJ_PASSWD_LEN[$xInstanceName]}
+    [ -z "${xInstanceSettings}" ] && continue
+    IFS=',' read -ra xInstanceArr <<< "${xInstanceSettings}"
+
+    setDirectives=
+    sValidatorName=Standard_Length_Validator-${xInstanceName}
+    sValidatorNameQ="'Standard_Length_Validator-${xInstanceName}'"
+ 
+    for g in "${xInstanceArr[@]}"; do
+        key=${g%%=*}
+        value=${g#*=}
+
+        case "$key" in
+            validator-name)
+                [[ "${value}" != "${value% *}" ]] && \
+                sValidatorNameQ="'${value}'" || \
+                sValidatorNameQ="${value}"
+
+                sValidatorName="${value}"
+                ;;
+            *)
+                [[ "${value}" != "${value% *}" ]] && \
+                setDirectives="${setDirectives} --set ${key}:'${value}'" || \
+                setDirectives="${setDirectives} --set ${key}:${value}"
+                ;;
+        esac
+    done
+
+    existingProps=$(${OPENDJ_HOME_DIR}/bin/dsconfig get-password-validator-prop \
+                        --hostname ${localTargetHost}                           \
+                        --port ${OPENDJ_ADMIN_PORT}                             \
+                        --bindDN "${localLDAPBindDN}"                           \
+                        --bindPassword ${localLDAPBindPW}                       \
+                        --validator-name "${sValidatorName}" -E --trustAll | grep -v -e "^Property" -e "^-" -e "does not exist")
+    [ -z "${existingProps}" ] && subOption=create-password-validator || subOption=set-password-validator-prop
+
+    tmpfile=$(mktemp /tmp/.XXXXXXXXXXXX)
+
+    echo
+    echo "#### ${xInstanceName} ==> ${subOption} - ${sValidatorName}"
+    cat <<- EOF > ${tmpfile}
+    ${OPENDJ_HOME_DIR}/bin/dsconfig ${subOption}    \
+    --hostname ${localTargetHost}           \
+    --port ${OPENDJ_ADMIN_PORT}             \
+    --bindDN "${localLDAPBindDN}"           \
+    --bindPassword ${localLDAPBindPW}       \
+    --validator-name ${sValidatorNameQ}     \
+	--set enabled:true                      \
+	$setDirectives                          \
+    $([ "${subOption}" == "create-password-validator" ] && echo "--type length-based") \
+	--trustAll                              \
+	--no-prompt
+	EOF
+
+    source ${tmpfile}
+    if [ $? -eq 0 ]; then
+        echo
+        ${OPENDJ_HOME_DIR}/bin/dsconfig get-password-validator-prop \
+        --hostname ${localTargetHost}                           \
+        --port ${OPENDJ_ADMIN_PORT}                             \
+        --bindDN "${localLDAPBindDN}"                           \
+        --bindPassword ${localLDAPBindPW}                       \
+        --validator-name "${sValidatorName}" -E --trustAll
+
+        rm ${tmpfile}
+    else
+        echo "#### ERROR EXECUTING ${xInstanceName} ==> ${subOption} - ${sValidatorName}"
+        rm ${tmpfile}
+        return 1
+    fi
+done

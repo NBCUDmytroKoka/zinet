@@ -1,0 +1,66 @@
+################################################
+#	Copyright (c) 2015-18 zibernetics, Inc.
+#
+#	Licensed under the Apache License, Version 2.0 (the "License");
+#	you may not use this file except in compliance with the License.
+#	You may obtain a copy of the License at
+#	
+#	    http://www.apache.org/licenses/LICENSE-2.0
+#	
+#	Unless required by applicable law or agreed to in writing, software
+#	distributed under the License is distributed on an "AS IS" BASIS,
+#	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#	See the License for the specific language governing permissions and
+#	limitations under the License.
+#
+################################################
+
+waitForOpenDJToStart() {
+    theHost="${1}"
+    thePort="${2}"
+    theTimeout="${3}"
+
+	echo -n "Waiting for OpenDJ to start up"
+
+    [ -z ${theTimeout} ] && theTimeout=600    
+	start_time=$( date '+%s' )
+	end_time=$(( $start_time + $theTimeout ))
+	while [ $start_time -lt $end_time ]; do
+		echo -n "."
+# 		 nc -zv ${theHost} ${thePort} 2>/dev/null 1> /dev/null 
+		(echo > /dev/tcp/$theHost/$thePort) >/dev/null 2>&1
+		if [ $? -eq 0 ]; then
+			start_time=$end_time
+			echo
+			echo "OpenDJ on port $thePort started at $theHost"
+		else
+			sleep 5s
+			start_time=$( date '+%s' )
+		fi
+	done
+}
+
+waitForOpenDJToStop() {
+    theHost="${1}"
+    thePort="${2}"
+    theTimeout="${3}"
+
+	echo -n "Waiting for OpenDJ to shut down"
+
+    [ -z ${theTimeout} ] && theTimeout=600    
+	start_time=$( date '+%s' )
+	end_time=$(( $start_time + $theTimeout ))
+	while [ $start_time -lt $end_time ]; do
+		echo -n "."
+# 		 nc -zv ${theHost} ${thePort} 2>/dev/null 1> /dev/null 
+		(echo > /dev/tcp/$theHost/$thePort) >/dev/null 2>&1
+		if [ $? -ne 0 ]; then
+			start_time=$end_time
+			echo
+			echo "OpenDJ on port $thePort stopped at $theHost"
+		else
+			sleep 5s
+			start_time=$( date '+%s' )
+		fi
+	done
+}

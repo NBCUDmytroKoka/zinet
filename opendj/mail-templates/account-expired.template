@@ -1,0 +1,4 @@
+The user account has expired for user: %%notification-user-attr:uid%%
+
+For further assistance, please contact: ${OPENDJ_HELP_MAILADDR}
+

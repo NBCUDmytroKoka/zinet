@@ -1,0 +1,105 @@
+################################################
+#	Copyright (c) 2015-18 zibernetics, Inc.
+#
+#	Licensed under the Apache License, Version 2.0 (the "License");
+#	you may not use this file except in compliance with the License.
+#	You may obtain a copy of the License at
+#	
+#	    http://www.apache.org/licenses/LICENSE-2.0
+#	
+#	Unless required by applicable law or agreed to in writing, software
+#	distributed under the License is distributed on an "AS IS" BASIS,
+#	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#	See the License for the specific language governing permissions and
+#	limitations under the License.
+#
+################################################
+
+# This command sets backend properties:
+#   base-dn = For creating a new backend
+#   
+
+for xInstanceName in ${localBackendList}; do
+    xInstanceSettings=${OPENDJ_BACKEND_CFG[$xInstanceName]}
+    [ -z "${xInstanceSettings}" ] && continue
+    IFS=';' read -ra xInstanceArr <<< "${xInstanceSettings}"
+
+	baseDN=${OPENDJ_BASE_DNS[$xInstanceName]}
+    [ -z "${baseDN}" ] && continue
+
+    setDirectives=
+    sBackendType=
+    sBackendName=${xInstanceName}
+
+    for g in "${xInstanceArr[@]}"; do
+        key=${g%%:*}
+        value=${g#*:}
+
+        case "$key" in
+            backend-name)
+                sBackendName="${value}"
+                ;;
+            base-dn)
+                [[ "${value}" != "${value% *}" ]] && \
+                setDirectives="${setDirectives} --add ${key}:'${value}'" || \
+                setDirectives="${setDirectives} --add ${key}:${value}"
+                ;;
+            type)
+                sBackendType="${value}"
+                ;;
+            *)
+                [[ "${value}" != "${value% *}" ]] && \
+                setDirectives="${setDirectives} --set ${key}:'${value}'" || \
+                setDirectives="${setDirectives} --set ${key}:${value}"
+                ;;
+        esac
+    done
+
+    if [ ! -z "${sBackendName}" ] && [ ! -z "${sBackendType}" ]; then
+        existingProps=$(${OPENDJ_HOME_DIR}/bin/dsconfig get-backend-prop \
+                            --hostname ${localTargetHost}                           \
+                            --port ${OPENDJ_ADMIN_PORT}                             \
+                            --bindDN "${localLDAPBindDN}"                           \
+                            --bindPassword ${localLDAPBindPW}                       \
+                            --backend-name "${sBackendName}" -E --trustAll | grep -v -e "^Property" -e "^-" -e "does not exist")
+        [ -z "${existingProps}" ] && subOption=create-backend || subOption=set-backend-prop
+
+        tmpfile=$(mktemp /tmp/.XXXXXXXXXXXX)
+
+        echo
+        echo "#### ${xInstanceName} ==> ${subOption} - ${sBackendName}"
+        cat <<- EOF > ${tmpfile}
+        ${OPENDJ_HOME_DIR}/bin/dsconfig ${subOption}    \
+        --hostname ${localTargetHost}       \
+        --port ${OPENDJ_ADMIN_PORT}         \
+        --bindDN "${localLDAPBindDN}"       \
+        --bindPassword ${localLDAPBindPW}   \
+        --backend-name "${sBackendName}"    \
+        $([ "${subOption}" == "create-backend" ] && echo "--set base-dn:\"${baseDN}\"") \
+        $([ "${subOption}" == "create-backend" ] && echo "--type ${sBackendType}") \
+        --set enabled:true                  \
+        $setDirectives                      \
+        --trustAll                          \
+        --no-prompt
+		EOF
+
+        source ${tmpfile}
+        if [ $? -eq 0 ]; then
+            echo
+            ${OPENDJ_HOME_DIR}/bin/dsconfig get-backend-prop \
+            --hostname ${localTargetHost}                           \
+            --port ${OPENDJ_ADMIN_PORT}                             \
+            --bindDN "${localLDAPBindDN}"                           \
+            --bindPassword ${localLDAPBindPW}                       \
+            --backend-name "${sBackendName}" -E --trustAll
+
+            rm ${tmpfile}
+        else
+            echo "#### ERROR EXECUTING ${xInstanceName} ==> ${subOption} - ${sBackendName}"
+            rm ${tmpfile}
+            return 1
+        fi
+    else
+        echo "#### Error:  no backend create set properties were defined"    
+    fi
+done

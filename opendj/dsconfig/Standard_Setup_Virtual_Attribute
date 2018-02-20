@@ -1,0 +1,95 @@
+################################################
+#	Copyright (c) 2015-18 zibernetics, Inc.
+#
+#	Licensed under the Apache License, Version 2.0 (the "License");
+#	you may not use this file except in compliance with the License.
+#	You may obtain a copy of the License at
+#	
+#	    http://www.apache.org/licenses/LICENSE-2.0
+#	
+#	Unless required by applicable law or agreed to in writing, software
+#	distributed under the License is distributed on an "AS IS" BASIS,
+#	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#	See the License for the specific language governing permissions and
+#	limitations under the License.
+#
+################################################
+
+# This command creates a virtual attribute
+
+for xInstanceName in ${localVirtualAttributeList}; do
+    xInstanceSettings=${OPENDJ_VIRTATTRS[$xInstanceName]}
+    [ -z "${xInstanceSettings}" ] && continue
+    IFS=';' read -ra xInstanceArr <<< "${xInstanceSettings}"
+
+    setDirectives=
+    vaName=Standard_Virtual_Attribute-${xInstanceName}
+    vaNameQ="'Standard_Virtual_Attribute-${xInstanceName}'"
+    
+    for g in "${xInstanceArr[@]}"; do
+        key=${g%%:*}
+        value=${g#*:}
+
+        case "$key" in
+            name)
+                [[ "${value}" != "${value% *}" ]] && \
+                vaNameQ="'${value}'" || \
+                vaNameQ="${value}"
+
+                vaName="${value}"
+                ;;
+            *)
+                [[ "${value}" != "${value% *}" ]] && \
+                setDirectives="${setDirectives} --set ${key}:'${value}'" || \
+                setDirectives="${setDirectives} --set ${key}:${value}"
+                ;;
+        esac
+    done
+
+    if [ ! -z "${setDirectives}" ]; then
+        existingProps=$(${OPENDJ_HOME_DIR}/bin/dsconfig get-virtual-attribute-prop  \
+                            --hostname ${localTargetHost}                           \
+                            --port ${OPENDJ_ADMIN_PORT}                             \
+                            --bindDN "${localLDAPBindDN}"                           \
+                            --bindPassword ${localLDAPBindPW}                       \
+                            --name "${vaName}" -E --trustAll | grep -v -e "^Property" -e "^-" -e "does not exist")
+        [ -z "${existingProps}" ] && subOption=create-virtual-attribute || subOption=set-virtual-attribute-prop
+
+        tmpfile=$(mktemp /tmp/.XXXXXXXXXXXX)
+
+        echo
+        echo "#### ${xInstanceName} ==> ${subOption} - ${vaName}"
+        cat <<- EOF > ${tmpfile}
+        ${OPENDJ_HOME_DIR}/bin/dsconfig ${subOption} \
+        --hostname ${localTargetHost}       \
+        --port ${OPENDJ_ADMIN_PORT}         \
+        --bindDN "${localLDAPBindDN}"       \
+        --bindPassword ${localLDAPBindPW}   \
+        --name ${vaNameQ}                   \
+        $setDirectives                      \
+        $([ "${subOption}" == "create-virtual-attribute" ] && echo "--type user-defined") \
+        --set enabled:true                  \
+        --trustAll                          \
+        -X -n
+		EOF
+
+        source ${tmpfile}
+        if [ $? -eq 0 ]; then
+            ${OPENDJ_HOME_DIR}/bin/dsconfig get-virtual-attribute-prop  \
+            --hostname ${localTargetHost}                           \
+            --port ${OPENDJ_ADMIN_PORT}                             \
+            --bindDN "${localLDAPBindDN}"                           \
+            --bindPassword ${localLDAPBindPW}                       \
+            --name "${vaName}" -E --trustAll
+
+            rm ${tmpfile}
+        else
+            echo "#### ERROR EXECUTING ${xInstanceName} ==> ${subOption} - ${vaName}"
+            rm ${tmpfile}
+            return 1
+        fi
+    else
+        echo "#### Error: no virtual attribute settings were found"
+        return 1
+    fi
+done
