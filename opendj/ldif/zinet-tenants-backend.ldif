@@ -1,0 +1,105 @@
+################################################
+#	Copyright (c) 2015-18 zibernetics, Inc.
+#
+#	Licensed under the Apache License, Version 2.0 (the "License");
+#	you may not use this file except in compliance with the License.
+#	You may obtain a copy of the License at
+#	
+#	    http://www.apache.org/licenses/LICENSE-2.0
+#	
+#	Unless required by applicable law or agreed to in writing, software
+#	distributed under the License is distributed on an "AS IS" BASIS,
+#	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#	See the License for the specific language governing permissions and
+#	limitations under the License.
+#
+################################################
+
+############################################################
+#
+#	Core ${localTenantId} Tenant naming context
+# 
+############################################################
+
+dn: ${OPENDJ_TENANT_HOME}
+objectClass: top
+objectClass: organization
+o: $(echo "${OPENDJ_TENANT_HOME}" | awk -F, '{ print $1 }' | awk -F= '{ print $2 }')
+
+dn: ${OPENDJ_USERS_TENANT_DN}
+objectClass: top
+objectClass: organizationalunit
+ou: $(echo "${OPENDJ_USERS_TENANT_DN}" | awk -F, '{ print $1 }' | awk -F= '{ print $2 }')
+
+dn: ${OPENDJ_GROUPS_TENANT_DN}
+objectClass: top
+objectClass: organizationalunit
+ou: $(echo "${OPENDJ_GROUPS_TENANT_DN}" | awk -F, '{ print $1 }' | awk -F= '{ print $2 }')
+
+dn: ${OPENDJ_SVCS_TENANT_DN}
+objectClass: top
+objectClass: organizationalunit
+ou: $(echo "${OPENDJ_SVCS_TENANT_DN}" | awk -F, '{ print $1 }' | awk -F= '{ print $2 }')
+
+dn: uid=service_opendj,${OPENDJ_SVCS_TENANT_DN}
+objectClass: top
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+objectClass: person
+cn: service_opendj
+sn: service_opendj
+uid: service_opendj
+$([ ! -z "${localTenantSvcPasswd}" ] && { echo "userPassword: ${localTenantSvcPasswd}"; })
+
+############################################################
+#	Tenant Group entries
+############################################################
+
+dn: cn=tenant_admins,${OPENDJ_GROUPS_TENANT_DN}
+objectClass: top
+objectClass: groupofuniquenames
+cn: tenant_admins
+uniqueMember: uid=service_opendj,${OPENDJ_SVCS_TENANT_DN}
+
+dn: cn=tenant_password_admins,${OPENDJ_GROUPS_TENANT_DN}
+objectClass: top
+objectClass: groupofuniquenames
+cn: tenant_password_admins
+
+dn: cn=tenant_psearch,${OPENDJ_GROUPS_TENANT_DN}
+objectClass: top
+objectClass: groupofuniquenames
+cn: tenant_psearch
+
+dn: cn=tenant_idsearch,${OPENDJ_GROUPS_TENANT_DN}
+objectClass: top
+objectClass: groupofuniquenames
+cn: tenant_idsearch
+
+############################################################
+#	Tenant Admin privilege
+############################################################
+dn: cn=Tenant Administrator Privilege,${OPENDJ_TENANT_HOME}
+objectClass: collectiveAttributeSubentry
+objectClass: extensibleObject
+objectClass: subentry
+objectClass: top
+cn: Tenant Administrator Privilege
+ds-privilege-name;collective: password-reset
+ds-privilege-name;collective: proxied-auth
+ds-privilege-name;collective: subentry-write
+ds-rlim-lookthrough-limit;collective: 0
+ds-rlim-size-limit;collective: 0
+ds-rlim-time-limit;collective: 0
+subtreeSpecification: {base "${OPENDJ_TENANT_ROOT_NODN}", specificationFilter
+  "(isMemberOf=cn=tenant_admins,${OPENDJ_GROUPS_TENANT_DN})" }
+
+dn: cn=Tenant Password Privilege,${OPENDJ_TENANT_HOME}
+objectClass: collectiveAttributeSubentry
+objectClass: extensibleObject
+objectClass: subentry
+objectClass: top
+cn: Tenant Password Privilege
+ds-privilege-name;collective: password-reset
+subtreeSpecification: {base "${OPENDJ_TENANT_ROOT_NODN}", specificationFilter
+  "(isMemberOf=cn=tenant_password_admins,${OPENDJ_GROUPS_TENANT_DN})" }

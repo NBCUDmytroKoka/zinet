@@ -1,0 +1,4 @@
+The user account has been disabled for user: %%notification-user-attr:uid%%
+
+For further assistance, please contact: ${OPENDJ_HELP_MAILADDR}
+
