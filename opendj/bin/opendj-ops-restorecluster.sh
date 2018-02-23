@@ -26,11 +26,12 @@ cd ${SCRIPTPATH}
 
 backupLocation=
 hostList=
+sharedBackupDir=
 : ${instanceRoot=}
 
-USAGE=" Usage: `basename $0` -l backupLocation -i hostList [ -I instanceRoot ]"
+USAGE=" Usage: `basename $0` -l backupLocation -i hostList [ -I instanceRoot ] [ -t sharedBackupDir ]"
 
-while getopts hl:i:I: OPT; do
+while getopts hl:i:I:t: OPT; do
     case "$OPT" in
         h)
             echo $USAGE
@@ -42,6 +43,9 @@ while getopts hl:i:I: OPT; do
             ;;            
         i)
             hostList="$OPTARG"
+            ;;
+        t)
+            sharedBackupDir="$OPTARG"
             ;;
         I)
             instanceRoot="$OPTARG"
@@ -201,7 +205,7 @@ fi
 
 if [ ${hostCount} -gt 1 ]; then
 
-    newBackupDir=$(sudo -u ${OPENDJ_USER} mktemp -d /tmp/backup-XXXXXXXXXXXX)
+    newBackupDir=$(sudo -u ${OPENDJ_USER} mktemp -d ${OPENDJ_BACKUP_DIR}/backup-XXXXXXXXXXXX)
     archiveName=$(basename ${newBackupDir})
     sudo chmod 755 ${newBackupDir}
     
@@ -220,33 +224,63 @@ if [ ${hostCount} -gt 1 ]; then
         exit 400
     fi
 
+    # if sharedBackupDir is defined, then it's a shared volume for all DJ servers
+    # so copy the new backup there, and don't distribute it via scp.
+    isShared=$([ -n "${sharedBackupDir}" ] && [ -d "${sharedBackupDir}" ] && echo true || echo false )
+    if $isShared; then
+        sudo -u ${OPENDJ_USER} mv -v ${newBackupDir} ${sharedBackupDir}/
+    fi
+
     # update all servers 1) copy backup to target host, 2) restore target host
     for idx in $(seq 1 $(($hostCount - 1))); do
         targetHost=${hostArray[${idx}]}
 
         jobFile=$(mktemp /tmp/$targetHost.XXXXXX)
         chmod +x ${jobFile}
-cat <<- EOF >> ${jobFile}
+
+        if $isShared; then
+cat <<- EOF > ${jobFile}
 #!/bin/bash
-echo "#### Restoring to host ${targetHost}"
-scp -oStrictHostKeyChecking=no -rp ${newBackupDir} ${targetHost}:/tmp/
-ssh -oStrictHostKeyChecking=no ${targetHost} "sudo chown -R ${OPENDJ_USER}:${OPENDJ_GRP} /tmp/${archiveName}"
+echo "#### Restoring (shared) to host ${targetHost}"
 
 ${OPENDJ_HOME_DIR}/bin/restore  \
 --hostname ${targetHost}        \
 --port ${OPENDJ_ADMIN_PORT}     \
 --bindDN "${dirMgrId}"          \
 --bindPassword "${dirMgrPasswd}" \
---backupDirectory "/tmp/${archiveName}" \
+--backupDirectory "${sharedBackupDir}/${archiveName}" \
 --backupID "${backupId}"        \
 --trustAll
 if [ $? -ne 0 ]; then
     echo "### Host (${targetHost}) failed to restore."
 fi
 
-ssh -oStrictHostKeyChecking=no ${targetHost} "sudo rm -rf /tmp/${archiveName}*"
 rm \$0
 EOF
+        
+        else
+cat <<- EOF > ${jobFile}
+#!/bin/bash
+echo "#### Restoring (scp) to host ${targetHost}"
+scp -oStrictHostKeyChecking=no -rp ${newBackupDir} ${targetHost}:${OPENDJ_BACKUP_DIR}/
+ssh -oStrictHostKeyChecking=no ${targetHost} "sudo chown -R ${OPENDJ_USER}:${OPENDJ_GRP} ${OPENDJ_BACKUP_DIR}/${archiveName}"
+
+${OPENDJ_HOME_DIR}/bin/restore  \
+--hostname ${targetHost}        \
+--port ${OPENDJ_ADMIN_PORT}     \
+--bindDN "${dirMgrId}"          \
+--bindPassword "${dirMgrPasswd}" \
+--backupDirectory "${OPENDJ_BACKUP_DIR}/${archiveName}" \
+--backupID "${backupId}"        \
+--trustAll
+if [ $? -ne 0 ]; then
+    echo "### Host (${targetHost}) failed to restore."
+fi
+
+ssh -oStrictHostKeyChecking=no ${targetHost} "sudo rm -rf ${OPENDJ_BACKUP_DIR}/${archiveName}*"
+rm \$0
+EOF
+        fi
 
         ${jobFile} 2>&1 > ${jobFile}.log &
         addPid "### Starting ${jobFile}" $!
