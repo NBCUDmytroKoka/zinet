@@ -395,11 +395,7 @@ declare -A openamPasswds=(
     [OPENAM_CTS_SVC_ACCT]="OpenDJ CTS Store Service Account"
     [OPENAM_USR_SVC_ACCT]="OpenDJ User Store Service Account")
 
-[ -f .odjpins ] &&  rm -f .odjpins
-[ -f .tomcatpin ] &&  rm -rf .tomcatpin
-[ -f .openampin ] &&  rm -rf .openampin
-[ -f .sshpin ] &&  rm -f .sshpin
-[ -f .dockerpin ] &&  rm -f .dockerpin
+RUNDATE_DATE=$(date +%s%3N)
 
 echo "#### Parsing config file"
 ini_parser ${localInventoryFile}
@@ -955,17 +951,17 @@ for serverId in $(grep -e "\[*\]" ${localInventoryFile} | tr -d '[' | tr -d ']' 
             [ ! -z "${OPENDJ_NODE_TEMPLATE}" ] && nodeOpts="-t ${OPENDJ_NODE_TEMPLATE}"
             
             echo "#### ${ZINET_TARGET_HOSTNAME} - preparing credentials"
-            [ ! -f .odjpins ] && copyPasswordFile .odjpins opendjPasswds "${localSecretsFile}"
+            [ ! -f .odjpins-${RUNDATE_DATE} ] && copyPasswordFile .odjpins-${RUNDATE_DATE} opendjPasswds "${localSecretsFile}"
 
             passwordOpts=
-            if [ -f .odjpins ]; then
+            if [ -f .odjpins-${RUNDATE_DATE} ]; then
                 echo "#### ${ZINET_TARGET_HOSTNAME} - pushing ${gDirMgrDN} credentials"
-                passwordOpts="-D \"${gDirMgrDN}\" -Y ${gRemoteBuildDir}/.odjpins"
+                passwordOpts="-D \"${gDirMgrDN}\" -Y ${gRemoteBuildDir}/.odjpins-${RUNDATE_DATE}"
 
-                SCP .odjpins ${userSSHOpts}${ZINET_TARGET_HOSTNAME}:${gRemoteBuildDir}/
+                SCP .odjpins-${RUNDATE_DATE} ${userSSHOpts}${ZINET_TARGET_HOSTNAME}:${gRemoteBuildDir}/
                 [ "${gHaveSudo}" == "true" ] \
-                    && SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "sudo chown root:root ${gRemoteBuildDir}/.odjpins && sudo chmod 400 ${gRemoteBuildDir}/.odjpins" \
-                    || SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "chown root:root ${gRemoteBuildDir}/.odjpins && chmod 400 ${gRemoteBuildDir}/.odjpins"
+                    && SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "sudo chown root:root ${gRemoteBuildDir}/.odjpins-${RUNDATE_DATE} && sudo chmod 400 ${gRemoteBuildDir}/.odjpins-${RUNDATE_DATE}" \
+                    || SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "chown root:root ${gRemoteBuildDir}/.odjpins-${RUNDATE_DATE} && chmod 400 ${gRemoteBuildDir}/.odjpins-${RUNDATE_DATE}"
             fi
 
             echo "#### Performing install-opendj.sh"
@@ -997,8 +993,8 @@ for serverId in $(grep -e "\[*\]" ${localInventoryFile} | tr -d '[' | tr -d ']' 
             exitOnErr  "$?" "Deploying OpenDJ password policy"
 
             [ "${gHaveSudo}" == "true" ] \
-                && SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "sudo rm -f ${gRemoteBuildDir}/.odjpins" \
-                || SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "rm -f ${gRemoteBuildDir}/.odjpins"
+                && SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "sudo rm -f ${gRemoteBuildDir}/.odjpins-${RUNDATE_DATE}" \
+                || SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "rm -f ${gRemoteBuildDir}/.odjpins-${RUNDATE_DATE}"
         fi
 
         # 9. Install NGINX
@@ -1056,17 +1052,17 @@ for serverId in $(grep -e "\[*\]" ${localInventoryFile} | tr -d '[' | tr -d ']' 
             fi
 
             echo "#### ${ZINET_TARGET_HOSTNAME} - preparing credentials"
-             [ ! -f .odjpins ] && copyPasswordFile .odjpins opendjPasswds "${localSecretsFile}"
+             [ ! -f .odjpins-${RUNDATE_DATE} ] && copyPasswordFile .odjpins-${RUNDATE_DATE} opendjPasswds "${localSecretsFile}"
 
             passwordOpts=
-            if [ -f .odjpins ]; then
+            if [ -f .odjpins-${RUNDATE_DATE} ]; then
                 echo "#### ${ZINET_TARGET_HOSTNAME} - pushing ${gDirMgrDN} credentials"
-                passwordOpts="-D \"${gDirMgrDN}\" -Y ${gRemoteBuildDir}/.odjpins"
+                passwordOpts="-D \"${gDirMgrDN}\" -Y ${gRemoteBuildDir}/.odjpins-${RUNDATE_DATE}"
 
-                SCP .odjpins ${userSSHOpts}${ZINET_TARGET_HOSTNAME}:${gRemoteBuildDir}/
+                SCP .odjpins-${RUNDATE_DATE} ${userSSHOpts}${ZINET_TARGET_HOSTNAME}:${gRemoteBuildDir}/
                 [ "${gHaveSudo}" == "true" ] \
-                    && SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "sudo chown root:root ${gRemoteBuildDir}/.odjpins && sudo chmod 400 ${gRemoteBuildDir}/.odjpins" \
-                    || SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "chown root:root ${gRemoteBuildDir}/.odjpins && chmod 400 ${gRemoteBuildDir}/.odjpins"
+                    && SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "sudo chown root:root ${gRemoteBuildDir}/.odjpins-${RUNDATE_DATE} && sudo chmod 400 ${gRemoteBuildDir}/.odjpins-${RUNDATE_DATE}" \
+                    || SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "chown root:root ${gRemoteBuildDir}/.odjpins-${RUNDATE_DATE} && chmod 400 ${gRemoteBuildDir}/.odjpins-${RUNDATE_DATE}"
             fi
 
             [ "${gHaveSudo}" == "true" ] \
@@ -1075,8 +1071,8 @@ for serverId in $(grep -e "\[*\]" ${localInventoryFile} | tr -d '[' | tr -d ']' 
             exitOnErr  "$?" "Replicating OpenDJ"
 
             [ "${gHaveSudo}" == "true" ] \
-                && SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "sudo rm -f ${gRemoteBuildDir}/.odjpins" \
-                || SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "rm -f ${gRemoteBuildDir}/.odjpins"            
+                && SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "sudo rm -f ${gRemoteBuildDir}/.odjpins-${RUNDATE_DATE}" \
+                || SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "rm -f ${gRemoteBuildDir}/.odjpins-${RUNDATE_DATE}"            
         fi
 
     else
@@ -1107,14 +1103,14 @@ for serverId in $(grep -e "\[*\]" ${localInventoryFile} | tr -d '[' | tr -d ']' 
             echo "#### ${ZINET_TARGET_HOSTNAME} - Deploying tenant schemas"
 
             passwordOpts=
-            if [ -f .odjpins ]; then
+            if [ -f .odjpins-${RUNDATE_DATE} ]; then
                 echo "#### ${ZINET_TARGET_HOSTNAME} - pushing ${gDirMgrDN} credentials"
-                passwordOpts="-D \"${gDirMgrDN}\" -Y ${gRemoteBuildDir}/.odjpins"
+                passwordOpts="-D \"${gDirMgrDN}\" -Y ${gRemoteBuildDir}/.odjpins-${RUNDATE_DATE}"
 
-                SCP .odjpins ${userSSHOpts}${ZINET_TARGET_HOSTNAME}:${gRemoteBuildDir}/
+                SCP .odjpins-${RUNDATE_DATE} ${userSSHOpts}${ZINET_TARGET_HOSTNAME}:${gRemoteBuildDir}/
                 [ "${gHaveSudo}" == "true" ] \
-                    && SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "sudo chown root:root ${gRemoteBuildDir}/.odjpins && sudo chmod 400 ${gRemoteBuildDir}/.odjpins" \
-                    || SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "chown root:root ${gRemoteBuildDir}/.odjpins && chmod 400 ${gRemoteBuildDir}/.odjpins"
+                    && SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "sudo chown root:root ${gRemoteBuildDir}/.odjpins-${RUNDATE_DATE} && sudo chmod 400 ${gRemoteBuildDir}/.odjpins-${RUNDATE_DATE}" \
+                    || SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "chown root:root ${gRemoteBuildDir}/.odjpins-${RUNDATE_DATE} && chmod 400 ${gRemoteBuildDir}/.odjpins-${RUNDATE_DATE}"
             fi
 
             [ -z "${DEPLOY_TENANT_ID}" ] && DEPLOY_TENANT_ID="${ziTenantId}"
@@ -1155,27 +1151,27 @@ for serverId in $(grep -e "\[*\]" ${localInventoryFile} | tr -d '[' | tr -d ']' 
             echo "#### ${ZINET_TARGET_HOSTNAME} - Deploying sshldap schema"
 
             echo "#### ${ZINET_TARGET_HOSTNAME} - preparing credentials"
-            [ ! -f .odjpins ] && copyPasswordFile .odjpins opendjPasswds "${localSecretsFile}"
+            [ ! -f .odjpins-${RUNDATE_DATE} ] && copyPasswordFile .odjpins-${RUNDATE_DATE} opendjPasswds "${localSecretsFile}"
 
-            SCP .odjpins ${userSSHOpts}${ZINET_TARGET_HOSTNAME}:${gRemoteBuildDir}/
+            SCP .odjpins-${RUNDATE_DATE} ${userSSHOpts}${ZINET_TARGET_HOSTNAME}:${gRemoteBuildDir}/
             [ "${gHaveSudo}" == "true" ] \
-                && SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "sudo chown root:root ${gRemoteBuildDir}/.odjpins && sudo chmod 400 ${gRemoteBuildDir}/.odjpins" \
-                || SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "chown root:root ${gRemoteBuildDir}/.odjpins && chmod 400 ${gRemoteBuildDir}/.odjpins"
+                && SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "sudo chown root:root ${gRemoteBuildDir}/.odjpins-${RUNDATE_DATE} && sudo chmod 400 ${gRemoteBuildDir}/.odjpins-${RUNDATE_DATE}" \
+                || SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "chown root:root ${gRemoteBuildDir}/.odjpins-${RUNDATE_DATE} && chmod 400 ${gRemoteBuildDir}/.odjpins-${RUNDATE_DATE}"
 
-            SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "${gRemoteBuildDir}/sshldap/bin/deploy-sshldap.sh -c ${gRemoteBuildDir}/config -l ${gRemoteBuildDir}/sshldap/ldif -D \"${gDirMgrDN}\" -Y ${gRemoteBuildDir}/.odjpins ${sshldapPasswordOpts}"
+            SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "${gRemoteBuildDir}/sshldap/bin/deploy-sshldap.sh -c ${gRemoteBuildDir}/config -l ${gRemoteBuildDir}/sshldap/ldif -D \"${gDirMgrDN}\" -Y ${gRemoteBuildDir}/.odjpins-${RUNDATE_DATE} ${sshldapPasswordOpts}"
             exitOnErr  "$?" "Deploying SSHLDAP"
 
             for f in ${SSHLDAP_FABRIC_LIST}; do
                 echo "#### ${ZINET_TARGET_HOSTNAME} - Deploying sshldap fabric ${f}"
                 [ "${gHaveSudo}" == "true" ] \
-                    && SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "sudo ${gRemoteBuildDir}/sshldap/bin/sshldap-add-fabric.sh -l ${gRemoteBuildDir}/sshldap/${f} -D \"${gDirMgrDN}\" -Y ${gRemoteBuildDir}/.odjpins" \
-                    || SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "${gRemoteBuildDir}/sshldap/bin/sshldap-add-fabric.sh -l ${gRemoteBuildDir}/sshldap/${f} -D \"${gDirMgrDN}\" -Y ${gRemoteBuildDir}/.odjpins"
+                    && SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "sudo ${gRemoteBuildDir}/sshldap/bin/sshldap-add-fabric.sh -l ${gRemoteBuildDir}/sshldap/${f} -D \"${gDirMgrDN}\" -Y ${gRemoteBuildDir}/.odjpins-${RUNDATE_DATE}" \
+                    || SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "${gRemoteBuildDir}/sshldap/bin/sshldap-add-fabric.sh -l ${gRemoteBuildDir}/sshldap/${f} -D \"${gDirMgrDN}\" -Y ${gRemoteBuildDir}/.odjpins-${RUNDATE_DATE}"
                 exitOnErr  "$?" "Deploying SSHLDAP fabric"
             done
 
             [ "${gHaveSudo}" == "true" ] \
-                && SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "sudo rm -f ${gRemoteBuildDir}/.odjpins" \
-                || SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "rm -f ${gRemoteBuildDir}/.odjpins"
+                && SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "sudo rm -f ${gRemoteBuildDir}/.odjpins-${RUNDATE_DATE}" \
+                || SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "rm -f ${gRemoteBuildDir}/.odjpins-${RUNDATE_DATE}"
         fi
 
         # 3. Deploy Docker
@@ -1184,19 +1180,19 @@ for serverId in $(grep -e "\[*\]" ${localInventoryFile} | tr -d '[' | tr -d ']' 
             echo "#### ${ZINET_TARGET_HOSTNAME} - Deploying docker schema"
 
             echo "#### ${ZINET_TARGET_HOSTNAME} - preparing credentials"
-            [ ! -f .odjpins ] && copyPasswordFile .odjpins opendjPasswds "${localSecretsFile}"
+            [ ! -f .odjpins-${RUNDATE_DATE} ] && copyPasswordFile .odjpins-${RUNDATE_DATE} opendjPasswds "${localSecretsFile}"
 
-            SCP .odjpins ${userSSHOpts}${ZINET_TARGET_HOSTNAME}:${gRemoteBuildDir}/
+            SCP .odjpins-${RUNDATE_DATE} ${userSSHOpts}${ZINET_TARGET_HOSTNAME}:${gRemoteBuildDir}/
             [ "${gHaveSudo}" == "true" ] \
-                && SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "sudo chown root:root ${gRemoteBuildDir}/.odjpins && sudo chmod 400 ${gRemoteBuildDir}/.odjpins" \
-                || SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "chown root:root ${gRemoteBuildDir}/.odjpins && chmod 400 ${gRemoteBuildDir}/.odjpins"
+                && SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "sudo chown root:root ${gRemoteBuildDir}/.odjpins-${RUNDATE_DATE} && sudo chmod 400 ${gRemoteBuildDir}/.odjpins-${RUNDATE_DATE}" \
+                || SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "chown root:root ${gRemoteBuildDir}/.odjpins-${RUNDATE_DATE} && chmod 400 ${gRemoteBuildDir}/.odjpins-${RUNDATE_DATE}"
 
-            SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "${gRemoteBuildDir}/docker/bin/deploy-docker.sh -l ${gRemoteBuildDir}/docker/ldif -C ${gRemoteBuildDir}/config/docker-config.properties -D \"${gDirMgrDN}\" -Y ${gRemoteBuildDir}/.odjpins"
+            SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "${gRemoteBuildDir}/docker/bin/deploy-docker.sh -l ${gRemoteBuildDir}/docker/ldif -C ${gRemoteBuildDir}/config/docker-config.properties -D \"${gDirMgrDN}\" -Y ${gRemoteBuildDir}/.odjpins-${RUNDATE_DATE}"
             exitOnErr  "$?" "Deploying Docker"
 
             [ "${gHaveSudo}" == "true" ] \
-                && SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "sudo rm -f ${gRemoteBuildDir}/.odjpins" \
-                || SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "rm -f ${gRemoteBuildDir}/.odjpins"
+                && SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "sudo rm -f ${gRemoteBuildDir}/.odjpins-${RUNDATE_DATE}" \
+                || SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "rm -f ${gRemoteBuildDir}/.odjpins-${RUNDATE_DATE}"
         fi
     else
     	echo "#### Could not find config for ini_section_server.${serverId}"
@@ -1225,20 +1221,20 @@ for serverId in $(grep -e "\[*\]" ${localInventoryFile} | tr -d '[' | tr -d ']' 
             echo "#### ${ZINET_TARGET_HOSTNAME} - Installing SSHLDAP module"
 
             echo "#### ${ZINET_TARGET_HOSTNAME} - preparing credentials"
-            [ ! -f .sshpin ] && copyPasswordFile .sshpin sshPasswds "${localSecretsFile}"
+            [ ! -f .sshpin-${RUNDATE_DATE} ] && copyPasswordFile .sshpin-${RUNDATE_DATE} sshPasswds "${localSecretsFile}"
 
             if [ -z "${SSHLDAP_TENANT_ID}" ]; then
                 SSHLDAP_TENANT_ID="${ziTenantId}"
             fi
 
             passwordOpts=
-            if [ -f .sshpin ]; then
-                passwordOpts="-A ${gRemoteBuildDir}/.sshpin"
+            if [ -f .sshpin-${RUNDATE_DATE} ]; then
+                passwordOpts="-A ${gRemoteBuildDir}/.sshpin-${RUNDATE_DATE}"
 
-                SCP .sshpin ${userSSHOpts}${ZINET_TARGET_HOSTNAME}:${gRemoteBuildDir}/
+                SCP .sshpin-${RUNDATE_DATE} ${userSSHOpts}${ZINET_TARGET_HOSTNAME}:${gRemoteBuildDir}/
                 [ "${gHaveSudo}" == "true" ] \
-                    && SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "sudo chown root:root ${gRemoteBuildDir}/.sshpin && sudo chmod 400 ${gRemoteBuildDir}/.sshpin" \
-                    || SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "chown root:root ${gRemoteBuildDir}/.sshpin && chmod 400 ${gRemoteBuildDir}/.sshpin"
+                    && SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "sudo chown root:root ${gRemoteBuildDir}/.sshpin-${RUNDATE_DATE} && sudo chmod 400 ${gRemoteBuildDir}/.sshpin-${RUNDATE_DATE}" \
+                    || SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "chown root:root ${gRemoteBuildDir}/.sshpin-${RUNDATE_DATE} && chmod 400 ${gRemoteBuildDir}/.sshpin-${RUNDATE_DATE}"
             fi
 
             [ "${gHaveSudo}" == "true" ] \
@@ -1246,10 +1242,10 @@ for serverId in $(grep -e "\[*\]" ${localInventoryFile} | tr -d '[' | tr -d ']' 
                 || SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "${gRemoteBuildDir}/sshldap/bin/install-sshldap.sh -c ${gRemoteBuildDir}/config -i ${SSHLDAP_FABRIC_HOST_ID} -t ${SSHLDAP_TENANT_ID}  ${passwordOpts}"
             exitOnErr  "$?" "Installing SSHLDAP"
 
-            if [ -f .sshpin ]; then
+            if [ -f .sshpin-${RUNDATE_DATE} ]; then
                 [ "${gHaveSudo}" == "true" ] \
-                    && SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "sudo rm -f ${gRemoteBuildDir}/.sshpin" \
-                    || SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "rm -f ${gRemoteBuildDir}/.sshpin"
+                    && SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "sudo rm -f ${gRemoteBuildDir}/.sshpin-${RUNDATE_DATE}" \
+                    || SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "rm -f ${gRemoteBuildDir}/.sshpin-${RUNDATE_DATE}"
             fi            
         fi
 
@@ -1260,16 +1256,16 @@ for serverId in $(grep -e "\[*\]" ${localInventoryFile} | tr -d '[' | tr -d ']' 
             echo "#### ${ZINET_TARGET_HOSTNAME} - Installing docker module"
 
             echo "#### ${ZINET_TARGET_HOSTNAME} - preparing credentials"
-            [ ! -f .dockerpin ] && copyPasswordFile .dockerpin dockerPasswds "${localSecretsFile}"
+            [ ! -f .dockerpin-${RUNDATE_DATE} ] && copyPasswordFile .dockerpin-${RUNDATE_DATE} dockerPasswds "${localSecretsFile}"
 
             passwordOpts=
-            if [ -f .dockerpin ]; then
-                passwordOpts="-Y ${gRemoteBuildDir}/.dockerpin"
+            if [ -f .dockerpin-${RUNDATE_DATE} ]; then
+                passwordOpts="-Y ${gRemoteBuildDir}/.dockerpin-${RUNDATE_DATE}"
 
-                SCP .dockerpin ${userSSHOpts}${ZINET_TARGET_HOSTNAME}:${gRemoteBuildDir}/
+                SCP .dockerpin-${RUNDATE_DATE} ${userSSHOpts}${ZINET_TARGET_HOSTNAME}:${gRemoteBuildDir}/
                 [ "${gHaveSudo}" == "true" ] \
-                    && SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "sudo chown root:root ${gRemoteBuildDir}/.dockerpin && sudo chmod 400 ${gRemoteBuildDir}/.dockerpin" \
-                    || SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "chown root:root ${gRemoteBuildDir}/.dockerpin && chmod 400 ${gRemoteBuildDir}/.dockerpin"
+                    && SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "sudo chown root:root ${gRemoteBuildDir}/.dockerpin-${RUNDATE_DATE} && sudo chmod 400 ${gRemoteBuildDir}/.dockerpin-${RUNDATE_DATE}" \
+                    || SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "chown root:root ${gRemoteBuildDir}/.dockerpin-${RUNDATE_DATE} && chmod 400 ${gRemoteBuildDir}/.dockerpin-${RUNDATE_DATE}"
             fi
 
             [ "${gHaveSudo}" == "true" ] \
@@ -1277,10 +1273,10 @@ for serverId in $(grep -e "\[*\]" ${localInventoryFile} | tr -d '[' | tr -d ']' 
                 || SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "${gRemoteBuildDir}/docker/bin/install-docker.sh -c ${gRemoteBuildDir}/config ${passwordOpts}"
             exitOnErr  "$?" "Installing Docker"
 
-            if [ -f .dockerpin ]; then
+            if [ -f .dockerpin-${RUNDATE_DATE} ]; then
                 [ "${gHaveSudo}" == "true" ] \
-                    && SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "sudo rm -f ${gRemoteBuildDir}/.dockerpin" \
-                    || SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "rm -f ${gRemoteBuildDir}/.dockerpin"
+                    && SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "sudo rm -f ${gRemoteBuildDir}/.dockerpin-${RUNDATE_DATE}" \
+                    || SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "rm -f ${gRemoteBuildDir}/.dockerpin-${RUNDATE_DATE}"
             fi
         fi
 
@@ -1291,7 +1287,7 @@ for serverId in $(grep -e "\[*\]" ${localInventoryFile} | tr -d '[' | tr -d ']' 
             echo "#### ${ZINET_TARGET_HOSTNAME} - Installing Tomcat module"
 
             echo "#### ${ZINET_TARGET_HOSTNAME} - preparing credentials"
-            [ ! -f .tomcatpin ] && copyPasswordFile .tomcatpin tomcatPasswds "${localSecretsFile}"
+            [ ! -f .tomcatpin-${RUNDATE_DATE} ] && copyPasswordFile .tomcatpin-${RUNDATE_DATE} tomcatPasswds "${localSecretsFile}"
 
             tarOpts=
             if [ ! -z "${TOMCAT_TAR_FILENAME}" ] && [ -f "${localRepoFolder}/${TOMCAT_TAR_FILENAME}" ]; then
@@ -1308,13 +1304,13 @@ for serverId in $(grep -e "\[*\]" ${localInventoryFile} | tr -d '[' | tr -d ']' 
             fi
 
             passwordOpts=
-            if [ -f .tomcatpin ]; then
-                passwordOpts="-Y ${gRemoteBuildDir}/.tomcatpin"
+            if [ -f .tomcatpin-${RUNDATE_DATE} ]; then
+                passwordOpts="-Y ${gRemoteBuildDir}/.tomcatpin-${RUNDATE_DATE}"
 
-                SCP .tomcatpin ${userSSHOpts}${ZINET_TARGET_HOSTNAME}:${gRemoteBuildDir}/
+                SCP .tomcatpin-${RUNDATE_DATE} ${userSSHOpts}${ZINET_TARGET_HOSTNAME}:${gRemoteBuildDir}/
                 [ "${gHaveSudo}" == "true" ] \
-                    && SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "sudo chown root:root ${gRemoteBuildDir}/.tomcatpin && sudo chmod 400 ${gRemoteBuildDir}/.tomcatpin" \
-                    || SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "chown root:root ${gRemoteBuildDir}/.tomcatpin && chmod 400 ${gRemoteBuildDir}/.tomcatpin"
+                    && SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "sudo chown root:root ${gRemoteBuildDir}/.tomcatpin-${RUNDATE_DATE} && sudo chmod 400 ${gRemoteBuildDir}/.tomcatpin-${RUNDATE_DATE}" \
+                    || SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "chown root:root ${gRemoteBuildDir}/.tomcatpin-${RUNDATE_DATE} && chmod 400 ${gRemoteBuildDir}/.tomcatpin-${RUNDATE_DATE}"
             fi
 
             configOpts="-c ${gRemoteBuildDir}/config"
@@ -1325,10 +1321,10 @@ for serverId in $(grep -e "\[*\]" ${localInventoryFile} | tr -d '[' | tr -d ']' 
                 || SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "${gRemoteBuildDir}/tomcat/bin/install-tomcat.sh ${configOpts} ${passwordOpts} ${tarOpts}"
             exitOnErr  "$?" "Installing Tomcat"
 
-            if [ -f .tomcatpin ]; then
+            if [ -f .tomcatpin-${RUNDATE_DATE} ]; then
                 [ "${gHaveSudo}" == "true" ] \
-                    && SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "sudo rm -f ${gRemoteBuildDir}/.tomcatpin" \
-                    || SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "rm -f ${gRemoteBuildDir}/.tomcatpin"
+                    && SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "sudo rm -f ${gRemoteBuildDir}/.tomcatpin-${RUNDATE_DATE}" \
+                    || SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "rm -f ${gRemoteBuildDir}/.tomcatpin-${RUNDATE_DATE}"
             fi
         fi
 
@@ -1339,14 +1335,14 @@ for serverId in $(grep -e "\[*\]" ${localInventoryFile} | tr -d '[' | tr -d ']' 
             echo "#### ${ZINET_TARGET_HOSTNAME} - Installing OpenAM module"
 
             echo "#### ${ZINET_TARGET_HOSTNAME} - preparing credentials"
-            [ ! -f .openampin ] && copyPasswordFile .openampin openamPasswds "${localSecretsFile}"
+            [ ! -f .openampin-${RUNDATE_DATE} ] && copyPasswordFile .openampin-${RUNDATE_DATE} openamPasswds "${localSecretsFile}"
 
             passwordOpts=
-            if [ -f .openampin ]; then
-                passwordOpts="-D \"${gDirMgrDN}\" -Y ${gRemoteBuildDir}/.openampin"
-                secretsOpts="-Y ${gRemoteBuildDir}/.openampin"
-                SCP .openampin ${userSSHOpts}${ZINET_TARGET_HOSTNAME}:${gRemoteBuildDir}/
-                SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "sudo chown root:root ${gRemoteBuildDir}/.openampin && sudo chmod 400 ${gRemoteBuildDir}/.openampin"
+            if [ -f .openampin-${RUNDATE_DATE} ]; then
+                passwordOpts="-D \"${gDirMgrDN}\" -Y ${gRemoteBuildDir}/.openampin-${RUNDATE_DATE}"
+                secretsOpts="-Y ${gRemoteBuildDir}/.openampin-${RUNDATE_DATE}"
+                SCP .openampin-${RUNDATE_DATE} ${userSSHOpts}${ZINET_TARGET_HOSTNAME}:${gRemoteBuildDir}/
+                SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "sudo chown root:root ${gRemoteBuildDir}/.openampin-${RUNDATE_DATE} && sudo chmod 400 ${gRemoteBuildDir}/.openampin-${RUNDATE_DATE}"
             fi
 
             configOpts="-c ${gRemoteBuildDir}/config"
@@ -1409,8 +1405,8 @@ for serverId in $(grep -e "\[*\]" ${localInventoryFile} | tr -d '[' | tr -d ']' 
                 exitOnErr  "$?" "Updating OpenAM"
             fi
 
-            if [ -f .openampin ]; then
-                SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "sudo rm -f ${gRemoteBuildDir}/.openampin"
+            if [ -f .openampin-${RUNDATE_DATE} ]; then
+                SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "sudo rm -f ${gRemoteBuildDir}/.openampin-${RUNDATE_DATE}"
             fi
         fi
         
@@ -1420,23 +1416,23 @@ for serverId in $(grep -e "\[*\]" ${localInventoryFile} | tr -d '[' | tr -d ']' 
             echo "#### Preparing to deploy OpenAM config on ${ZINET_TARGET_HOSTNAME}"
 
             echo "#### ${ZINET_TARGET_HOSTNAME} - preparing credentials"
-            [ ! -f .openampin ] && copyPasswordFile .openampin openamPasswds "${localSecretsFile}"
+            [ ! -f .openampin-${RUNDATE_DATE} ] && copyPasswordFile .openampin-${RUNDATE_DATE} openamPasswds "${localSecretsFile}"
 
             configOpts="-c ${gRemoteBuildDir}/config"
             [ ! -z ${OPENAM_CONFIG_DIR} ] && configOpts="-c ${gRemoteBuildDir}/${OPENAM_CONFIG_DIR}"
 
             passwordOpts=
-            if [ -f .openampin ]; then
-                passwordOpts="-Y ${gRemoteBuildDir}/.openampin"
-                SCP .openampin ${userSSHOpts}${ZINET_TARGET_HOSTNAME}:${gRemoteBuildDir}/
-                SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "chmod 400 ${gRemoteBuildDir}/.openampin"
+            if [ -f .openampin-${RUNDATE_DATE} ]; then
+                passwordOpts="-Y ${gRemoteBuildDir}/.openampin-${RUNDATE_DATE}"
+                SCP .openampin-${RUNDATE_DATE} ${userSSHOpts}${ZINET_TARGET_HOSTNAME}:${gRemoteBuildDir}/
+                SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "chmod 400 ${gRemoteBuildDir}/.openampin-${RUNDATE_DATE}"
             fi
 
             SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "${gRemoteBuildDir}/openam/bin/configure-openam.sh ${configOpts} ${passwordOpts}"
             exitOnErr  "$?" "Configuring OpenAM"
 
-            if [ -f .openampin ]; then
-                SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "rm -f ${gRemoteBuildDir}/.openampin"
+            if [ -f .openampin-${RUNDATE_DATE} ]; then
+                SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "rm -f ${gRemoteBuildDir}/.openampin-${RUNDATE_DATE}"
             fi        
         fi
 
@@ -1485,8 +1481,8 @@ for serverId in $(grep -e "\[*\]" ${localInventoryFile} | tr -d '[' | tr -d ']' 
                 echo "#### No updates were specified. Nothing updated."            
             fi
 
-            if [ -f .openampin ]; then
-                SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "sudo rm -f ${gRemoteBuildDir}/.openampin"
+            if [ -f .openampin-${RUNDATE_DATE} ]; then
+                SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "sudo rm -f ${gRemoteBuildDir}/.openampin-${RUNDATE_DATE}"
             fi
         fi
 
@@ -1526,17 +1522,17 @@ for serverId in $(grep -e "\[*\]" ${localInventoryFile} | tr -d '[' | tr -d ']' 
                         done
 
                         echo "#### ${ZINET_TARGET_HOSTNAME} - preparing credentials"
-                        [ ! -f .odjpins ] && copyPasswordFile .odjpins opendjPasswds "${localSecretsFile}"
+                        [ ! -f .odjpins-${RUNDATE_DATE} ] && copyPasswordFile .odjpins-${RUNDATE_DATE} opendjPasswds "${localSecretsFile}"
 
                         passwordOpts=
-                        if [ -f .odjpins ]; then
+                        if [ -f .odjpins-${RUNDATE_DATE} ]; then
                             echo "#### ${ZINET_TARGET_HOSTNAME} - pushing ${gDirMgrDN} credentials"
-                            passwordOpts="-D \"${gDirMgrDN}\" -Y ${gRemoteBuildDir}/.odjpins"
+                            passwordOpts="-D \"${gDirMgrDN}\" -Y ${gRemoteBuildDir}/.odjpins-${RUNDATE_DATE}"
 
-                            SCP .odjpins ${userSSHOpts}${ZINET_TARGET_HOSTNAME}:${gRemoteBuildDir}/
+                            SCP .odjpins-${RUNDATE_DATE} ${userSSHOpts}${ZINET_TARGET_HOSTNAME}:${gRemoteBuildDir}/
                             [ "${gHaveSudo}" == "true" ] \
-                                && SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "sudo chown root:root ${gRemoteBuildDir}/.odjpins && sudo chmod 400 ${gRemoteBuildDir}/.odjpins" \
-                                || SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "chown root:root ${gRemoteBuildDir}/.odjpins && chmod 400 ${gRemoteBuildDir}/.odjpins"
+                                && SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "sudo chown root:root ${gRemoteBuildDir}/.odjpins-${RUNDATE_DATE} && sudo chmod 400 ${gRemoteBuildDir}/.odjpins-${RUNDATE_DATE}" \
+                                || SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "chown root:root ${gRemoteBuildDir}/.odjpins-${RUNDATE_DATE} && chmod 400 ${gRemoteBuildDir}/.odjpins-${RUNDATE_DATE}"
                         fi
 
                         echo "#### Performing update-opendj.sh"
@@ -1547,8 +1543,8 @@ for serverId in $(grep -e "\[*\]" ${localInventoryFile} | tr -d '[' | tr -d ']' 
                         exitOnErr  "$?" "Installing OpenDJ"
 
                         [ "${gHaveSudo}" == "true" ] \
-                            && SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "sudo rm -f ${gRemoteBuildDir}/.odjpins" \
-                            || SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "rm -f ${gRemoteBuildDir}/.odjpins"
+                            && SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "sudo rm -f ${gRemoteBuildDir}/.odjpins-${RUNDATE_DATE}" \
+                            || SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "rm -f ${gRemoteBuildDir}/.odjpins-${RUNDATE_DATE}"
                         ;;
                     "rebuild-degraded")
                         echo "#### Preparing to rebuild degraded indexes"
@@ -1595,9 +1591,9 @@ for serverId in $(grep -e "\[*\]" ${localInventoryFile} | tr -d '[' | tr -d ']' 
     fi
 done
 
-[ -f .odjpins ] &&  rm -f .odjpins
-[ -f .tomcatpin ] &&  rm -rf .tomcatpin
-[ -f .openampin ] &&  rm -rf .openampin
-[ -f .sshpin ] &&  rm -f .sshpin
-[ -f .dockerpin ] &&  rm -f .dockerpin
+[ -f .odjpins-${RUNDATE_DATE} ] &&  rm -f .odjpins-${RUNDATE_DATE}
+[ -f .tomcatpin-${RUNDATE_DATE} ] &&  rm -rf .tomcatpin-${RUNDATE_DATE}
+[ -f .openampin-${RUNDATE_DATE} ] &&  rm -rf .openampin-${RUNDATE_DATE}
+[ -f .sshpin-${RUNDATE_DATE} ] &&  rm -f .sshpin-${RUNDATE_DATE}
+[ -f .dockerpin-${RUNDATE_DATE} ] &&  rm -f .dockerpin-${RUNDATE_DATE}
 
