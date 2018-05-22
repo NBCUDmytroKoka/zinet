@@ -21,9 +21,6 @@ SCRIPT=$(readlink -f $0)
 SCRIPTPATH=$(dirname ${SCRIPT})
 DIRNAME=$(basename ${SCRIPTPATH})
 
-SAVE_DIR=$(pwd)
-cd ${SCRIPTPATH}
-
 ################################################
 #
 #	Main program
@@ -33,7 +30,6 @@ cd ${SCRIPTPATH}
 set -a
 
 : ${instanceRoot=}
-[ ! -z "${1}" ] && instanceRoot=${1}
 
 source /etc/default/zinet 2>/dev/null
 if [ $? -ne 0 ]; then
@@ -52,7 +48,6 @@ if [ ! -z ${instanceRoot} ]; then
 fi
 
 for f in ${opendjCfgDir}/*.functions; do
-    echo "loading $f"
     source $f
     if [ $? -ne 0 ]; then
         echo "Error reading ${f}"
@@ -62,7 +57,6 @@ for f in ${opendjCfgDir}/*.functions; do
 done 2> /dev/null
 
 for f in ${opendjCfgDir}/opendj-*-default.properties; do
-    echo "loading $f"
     source $f
     if [ $? -ne 0 ]; then
         echo "Error reading ${f}"
@@ -72,7 +66,6 @@ for f in ${opendjCfgDir}/opendj-*-default.properties; do
 done 2> /dev/null
 
 for f in ${opendjCfgDir}/opendj-*-override.properties; do
-    echo "loading $f"
     source $f
     if [ $? -ne 0 ]; then
         echo "Error reading ${f}"
@@ -94,11 +87,4 @@ unset OPENDJ_JAVA_ARGS
 
 set +a
 
-echo "### Starting session $instID"
-echo
-cd ${OPENDJ_HOME_DIR}
-PS1="[$instID-shell@\h \W]\]$ " bash --init-file ${opendjCfgDir}/.bashrc
-echo
-echo "### Exiting session $instID"
-
-cd ${SAVE_DIR}
+exec "$@"
