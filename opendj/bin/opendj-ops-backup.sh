@@ -17,6 +17,9 @@
 #
 ################################################
 
+# Do not allow this script to run with unbound variables!
+set -o nounset
+
 SCRIPT=$(readlink -f $0)
 SCRIPTPATH=$(dirname ${SCRIPT})
 DIRNAME=$(basename ${SCRIPTPATH})
