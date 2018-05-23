@@ -114,6 +114,7 @@ for sBackendName in "${!OPENDJ_BACKUP_CFG[@]}"; do
     sCleanupRetention=
     sBackupDirectory=
     sBackendID=
+    sArchiveCommand=
 
     for g in "${xInstanceArr[@]}"; do
         key=${g%%=*}
@@ -148,6 +149,9 @@ for sBackendName in "${!OPENDJ_BACKUP_CFG[@]}"; do
                 ;;
             cleanupRetention)
                 sCleanupRetention="${value}"
+                ;;
+            archiveCommand)
+                sArchiveCommand="${value}"
                 ;;
             backupID)
                 sBackupID="${value}"
@@ -233,6 +237,9 @@ EOF
             cleanupOpts=
             [ ! -z "${sCleanupRetention}" ] && \
                 cleanupOpts="-r ${sCleanupRetention}"
+
+            [ ! -z "${sArchiveCommand}" ] && \
+                cleanupOpts="${cleanupOpts} -a '${sArchiveCommand}'"
 
             [ ! -z "${instanceRoot}" ] && \
                 cleanupOpts="${cleanupOpts} -I ${instanceRoot}"
