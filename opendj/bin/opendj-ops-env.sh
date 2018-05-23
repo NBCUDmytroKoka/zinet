@@ -27,8 +27,6 @@ DIRNAME=$(basename ${SCRIPTPATH})
 #
 ################################################
 
-set -a
-
 : ${instanceRoot=}
 
 source /etc/default/zinet 2>/dev/null
@@ -85,6 +83,4 @@ ADMIN_PORT=${OPENDJ_ADMIN_PORT}
 LDAP_PORT=${OPENDJ_LDAP_PORT}
 unset OPENDJ_JAVA_ARGS
 
-set +a
-
-exec "$@"
+eval "$@"
