@@ -17,9 +17,6 @@
 #
 ################################################
 
-# Do not allow this script to run with unbound variables!
-set -o nounset
-
 SCRIPT=$(readlink -f $0)
 SCRIPTPATH=$(dirname ${SCRIPT})
 DIRNAME=$(basename ${SCRIPTPATH})
@@ -169,8 +166,11 @@ if [ $? -eq 0 ]; then
         setDirectives="${setDirectives} --backUpAll"
 
     sBackupDirectory=$(grep "Backup Directory" <<< "${taskInfo}" | awk '{ print $3 }' | tr -d ' ')
-    [ ! -z "${sBackupDirectory}" ] && \
-        setDirectives="${setDirectives} --backupDirectory ${sBackupDirectory}"
+    if [ -z "${sBackupDirectory}" ]; then
+        sBackupDirectory=${OPENDJ_BACKUP_DIR}/${backupID}
+        mkdir -p "${sBackupDirectory}" 2>/dev/null
+    fi
+    setDirectives="${setDirectives} --backupDirectory ${sBackupDirectory}"
 
     sDependencies=$(grep "Dependencies" <<< "${taskInfo}" | awk '{ print $2 }' | tr -d ' ')
     [ ! -z "${sDependencies}" ] && [ "${sDependencies}" != "None" ] && \
