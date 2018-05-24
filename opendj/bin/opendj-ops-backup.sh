@@ -17,6 +17,9 @@
 #
 ################################################
 
+# Do not allow this script to run with unbound variables!
+set -o nounset
+
 SCRIPT=$(readlink -f $0)
 SCRIPTPATH=$(dirname ${SCRIPT})
 DIRNAME=$(basename ${SCRIPTPATH})
@@ -26,11 +29,12 @@ cd ${SCRIPTPATH}
 
 backupID=
 retentionCount=
+archiveCommand=
 : ${instanceRoot=}
 
-USAGE="	Usage: `basename $0` -i backupID [ -r retentionCount ] [ -I instanceRoot ]"
+USAGE="	Usage: `basename $0` -i backupID [ -r retentionCount ] [ -I instanceRoot ] [ -a archiveCommand ]"
 
-while getopts hi:r:I: OPT; do
+while getopts hi:r:I:a: OPT; do
     case "$OPT" in
         h)
             echo $USAGE
@@ -44,6 +48,9 @@ while getopts hi:r:I: OPT; do
             ;;
         I)
             instanceRoot="$OPTARG"
+            ;;
+        a)
+            archiveCommand="$OPTARG"
             ;;
         \?)
             # getopts issues an error message
@@ -182,16 +189,29 @@ if [ $? -eq 0 ]; then
 
     cd $(dirname ${sBackupDirectory})
     mkdir archive 2>/dev/null
-    tar -zcvf archive/${backupID}-$(date +%Y%m%d-%H%M%S).tgz $(basename ${sBackupDirectory}) >/dev/null 2>&1
+    BACKUP_DATE=$(date +%Y%m%d-%H%M%S)
+    tar -zcvf archive/${backupID}-${BACKUP_DATE}.tgz $(basename ${sBackupDirectory}) >/dev/null 2>&1
+    bResult=$?
     cd ${OLD_DIR}
 
-    # clean up old backup stuff
-    rm -rf ${sBackupDirectory}/*
+    if [ $bResult -eq 0 ]; then
+
+        # clean up old backup stuff
+        rm -rf ${sBackupDirectory}/*
     
-    if [ ! -z "${retentionCount}" ]; then
-        fileCnt=$(($(ls ${sBackupDirectory}/../archive/${backupID}-*.tgz 2>/dev/null| wc -l)-${retentionCount}))
-        [[ $fileCnt -gt 0 ]] && \
-            ls ${sBackupDirectory}/../archive/${backupID}-*.tgz | head -${fileCnt} | xargs rm -f
+        if [ ! -z "${retentionCount}" ]; then
+            fileCnt=$(($(ls ${sBackupDirectory}/../archive/${backupID}-*.tgz 2>/dev/null| wc -l)-${retentionCount}))
+        
+            # fire the archive command, if defined
+            [ -n "${archiveCommand}" ] && eval "${archiveCommand}"
+        
+            # roll off old archives, if any
+            [[ $fileCnt -gt 0 ]] && \
+                ls ${sBackupDirectory}/../archive/${backupID}-*.tgz | head -${fileCnt} | xargs rm -f
+        fi
+
+    else
+        logger -i -t iamfabric -p err "Danger: Failed to archive daily backup (${BACKUP_DATE}). "
     fi
 
     # schedule the new backup
