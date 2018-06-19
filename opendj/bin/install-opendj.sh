@@ -247,29 +247,33 @@ if [ "${OPENDJ_FIREWALL_ENABLED}" == "true" ]; then
     echo iptables-persistent iptables-persistent/autosave_v4 boolean true | debconf-set-selections
     echo iptables-persistent iptables-persistent/autosave_v6 boolean true | debconf-set-selections
 
-    $(which apt-get) && apt-get install -y iptables-persistent || yum install -y iptables-persistent
+    if ${OPENDJ_INSTALL_DEPS}; then
+        $(which apt-get) && apt-get install -y iptables-persistent || yum install -y iptables-persistent
+    fi
 fi
 
-echo "#### installing dependencies dist"
+if ${OPENDJ_INSTALL_DEPS}; then
+    echo "#### installing dependencies dist"
 
-haveApt=$(which apt-get 2>/dev/null)
+    haveApt=$(which apt-get 2>/dev/null)
 
-if [ ! -z "${haveApt}" ]; then
-    echo "#### updating OS packages - apt"
-    apt-get update -y && apt-get upgrade -y
-else
-    echo "#### updating OS packages - yum"
-    yum update -y && yum upgrade -y
-fi
+    if [ ! -z "${haveApt}" ]; then
+        echo "#### updating OS packages - apt"
+        apt-get update -y && apt-get upgrade -y
+    else
+        echo "#### updating OS packages - yum"
+        yum update -y && yum upgrade -y
+    fi
  
-needInstall=$(which unzip 2>/dev/null)
-if [ -z "${needInstall}" ]; then
-    [ ! -z "${haveApt}" ] && apt-get install -y unzip || yum install -y unzip
-fi
+    needInstall=$(which unzip 2>/dev/null)
+    if [ -z "${needInstall}" ]; then
+        [ ! -z "${haveApt}" ] && apt-get install -y unzip || yum install -y unzip
+    fi
 
-needInstall=$(which ldapsearch 2>/dev/null)
-if [ -z "${needInstall}" ]; then
-    [ ! -z "${haveApt}" ] && apt-get install -y ldap-utils || yum install -y openldap-clients
+    needInstall=$(which ldapsearch 2>/dev/null)
+    if [ -z "${needInstall}" ]; then
+        [ ! -z "${haveApt}" ] && apt-get install -y ldap-utils || yum install -y openldap-clients
+    fi
 fi
 
 echo "#### preparing opendj directory"

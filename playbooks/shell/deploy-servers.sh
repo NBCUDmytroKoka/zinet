@@ -237,7 +237,7 @@ intializeServerSettings() {
     OPENDJ_EXTENSIONS=
     OPENDJ_INSTANCE_CFG_DIR=
 
-    REPLICATE_OPENDJ=false
+    REPLICATE_OPENDJ=
     DEPLOY_SSHLDAP=false
     DEPLOY_TENANT=false
     DEPLOY_TENANT_ID=
@@ -1043,7 +1043,7 @@ for serverId in $(grep -e "\[*\]" ${localInventoryFile} | tr -d '[' | tr -d ']' 
 
         # 1. Replicate OpenDJ
         
-        if $REPLICATE_OPENDJ; then
+        if [ -n "${REPLICATE_OPENDJ}" ]; then
             echo
             echo "#### ${ZINET_TARGET_HOSTNAME} - Replicating opendj schema"
             instanceOpts=
@@ -1051,6 +1051,11 @@ for serverId in $(grep -e "\[*\]" ${localInventoryFile} | tr -d '[' | tr -d ']' 
                 instanceOpts="-I ${OPENDJ_INSTANCE_ID}"
             fi
 
+            replOpts=
+            if [  "${REPLICATE_OPENDJ}" == 'new' ]; then
+                replOpts="-n"
+            fi
+            
             echo "#### ${ZINET_TARGET_HOSTNAME} - preparing credentials"
              [ ! -f .odjpins-${RUNDATE_DATE} ] && copyPasswordFile .odjpins-${RUNDATE_DATE} opendjPasswds "${localSecretsFile}"
 
@@ -1066,7 +1071,7 @@ for serverId in $(grep -e "\[*\]" ${localInventoryFile} | tr -d '[' | tr -d ']' 
             fi
 
             [ "${gHaveSudo}" == "true" ] \
-                && SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "sudo ${gRemoteBuildDir}/opendj/bin/replicate-opendj.sh ${instanceOpts} ${passwordOpts}" \
+                && SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "sudo ${gRemoteBuildDir}/opendj/bin/replicate-opendj.sh ${instanceOpts} ${replOpts} ${passwordOpts}" \
                 || SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "${gRemoteBuildDir}/opendj/bin/replicate-opendj.sh ${instanceOpts} ${passwordOpts}"
             exitOnErr  "$?" "Replicating OpenDJ"
 
