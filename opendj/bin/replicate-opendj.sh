@@ -1,4 +1,4 @@
-#!/bin/bash -x
+#!/bin/bash
 
 ################################################
 #	Copyright (c) 2015-18 zibernetics, Inc.
@@ -156,18 +156,18 @@ replicateSimple()
                     --adminUID admin                            \
                     --adminPassword "${localAdminPasswd}"       \
                     --baseDN "${baseDN}"                        \
-                    --host1 ${primary}                          \
-                    --port1 ${OPENDJ_ADMIN_PORT}                \
+                    --host1 "${primary}"                        \
+                    --port1 "${OPENDJ_ADMIN_PORT}"              \
                     --bindDN1 "${localDirMgrDN}"                \
                     --bindPassword1 "${localDirMgrPasswd}"      \
-                    --replicationPort1 ${OPENDJ_REPL_PORT}      \
                     --secureReplication1                        \
-                    --host2 ${slave}                            \
-                    --port2 ${OPENDJ_ADMIN_PORT}                \
+                    --replicationPort1 "${OPENDJ_REPL_PORT}"    \
+                    --host2 "${slave}"                          \
+                    --port2 "${OPENDJ_ADMIN_PORT}"              \
                     --bindDN2 "${localDirMgrDN}"                \
                     --bindPassword2 "${localDirMgrPasswd}"      \
-                    --replicationPort2 ${OPENDJ_REPL_PORT}      \
                     --secureReplication2                        \
+                    --replicationPort2 "${OPENDJ_REPL_PORT}"    \
                     --trustAll --no-prompt
 
                     echo "#### Initializing Replication baseDN:${baseDN} ==> Primary:${primary} to Slave:${slave}"
@@ -175,10 +175,10 @@ replicateSimple()
                     --adminUID admin                        \
                     --adminPassword "${localAdminPasswd}"   \
                     --baseDN "${baseDN}"                    \
-                    --hostSource ${primary}                 \
-                    --portSource ${OPENDJ_ADMIN_PORT}       \
-                    --hostDestination ${slave}              \
-                    --portDestination ${OPENDJ_ADMIN_PORT}  \
+                    --hostSource "${primary}"               \
+                    --portSource "${OPENDJ_ADMIN_PORT}"     \
+                    --hostDestination "${slave}"            \
+                    --portDestination "${OPENDJ_ADMIN_PORT}" \
                     --trustAll --no-prompt
 
                     replStarted=true
@@ -238,20 +238,28 @@ replicateWithExternalRS()
         --adminUID admin                        \
         --adminPassword "${localAdminPasswd}"   \
         --baseDN "${baseDN}"                    \
-        --host1 ${OPENDJ_DS_SEED}               \
-        --port1 ${OPENDJ_ADMIN_PORT}            \
+        --host1 "${OPENDJ_RS_SEED}"             \
+        --port1 "${OPENDJ_ADMIN_PORT}"          \
         --bindDN1 "${localDirMgrDN}"            \
         --bindPassword1 "${localDirMgrPasswd}"  \
-        --noReplicationServer1                  \
         --secureReplication1                    \
-        --host2 ${OPENDJ_RS_SEED}               \
-        --port2 ${OPENDJ_ADMIN_PORT}            \
+        --replicationPort1 "${OPENDJ_REPL_PORT}" \
+        --onlyReplicationServer1                \
+        --host2 "${OPENDJ_DS_SEED}"             \
+        --port2 "${OPENDJ_ADMIN_PORT}"          \
         --bindDN2 "${localDirMgrDN}"            \
         --bindPassword2 "${localDirMgrPasswd}"  \
-        --replicationPort2 ${OPENDJ_REPL_PORT}  \
-        --onlyReplicationServer2                \
         --secureReplication2                    \
+        --noReplicationServer2                  \
         --trustAll --no-prompt
+        
+        ${OPENDJ_HOME_DIR}/bin/dsreplication initialize-all \
+        --adminUID admin                        \
+        --adminPassword "${localAdminPasswd}"   \
+        --baseDN "${baseDN}"                    \
+        --hostname "${OPENDJ_DS_SEED}"          \
+        --port "${OPENDJ_ADMIN_PORT}"           \
+        --trustAll --no-prompt        
         
     else    
         ### iterate the list of RS servers and find one that's configured. Use it as the seed server
@@ -264,8 +272,8 @@ replicateWithExternalRS()
             for rsServer in $(echo "${groupServers}" | sed "s/,/ /g"); do
                 echo "#### Finding replication server - rsServer: ${rsServer}"
                 replTopologyAll-$(${OPENDJ_HOME_DIR}/bin/dsreplication status \
-                        --hostname ${rsServer}    \
-                        --adminUID admin                \
+                        --hostname "${rsServer}"    \
+                        --adminUID admin            \
                         --adminPassword "${localAdminPasswd}" \
                         --no-prompt --trustall | grep "${baseDN}")
                 if [ $? -eq 0 ] && [ -n "${replTopologyAll}" ]; then
@@ -330,12 +338,12 @@ replicateWithExternalRS()
                 --adminUID admin                            \
                 --adminPassword "${localAdminPasswd}"       \
                 --baseDN "${baseDN}"                        \
-                --host1 "${OPENDJ_DS_SEED}"                 \
+                --host1 "${OPENDJ_RS_SEED}"                 \
                 --port1 "${OPENDJ_ADMIN_PORT}"              \
                 --bindDN1 "${localDirMgrDN}"                \
                 --bindPassword1 "${localDirMgrPasswd}"      \
-                --noReplicationServer1                      \
                 --secureReplication1                        \
+                --onlyReplicationServer1                    \
                 --host2 "${rsServer}"                       \
                 --port2 "${OPENDJ_ADMIN_PORT}"              \
                 --bindDN2 "${localDirMgrDN}"                \
