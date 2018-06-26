@@ -137,6 +137,11 @@ for f in ${opendjCfgDir}/opendj-*-override.properties; do source $f; done 2> /de
 echo "#### preparing to seed opendj"
 BACKOUT_DATE=$(date +%Y%m%d-%H%M%S)
 
+if [ -z "${OPENDJ_LDAP_SERVER_URI}" ]; then
+    echo "#### OPENDJ_LDAP_SERVER_URI is not defined, so no updates will be performed "
+    exit 0
+fi
+
 echo > /tmp/zinet-opendj-deploy-${BACKOUT_DATE}.ldif
 
 for backendName in "${!OPENDJ_BASE_DNS[@]}"; do
