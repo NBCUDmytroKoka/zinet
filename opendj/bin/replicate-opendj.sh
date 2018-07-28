@@ -33,10 +33,11 @@ localDirMgrDN=
 localSecretsFile=
 : ${instanceRoot=}
 localNewTopology=false
+localUseReplGrps=false
 
-USAGE="	Usage: `basename $0` -D Directory Manager DN -Y Secrets File [ -I instanceRoot ] [ -n =>> localNewTopology ]"
+USAGE="	Usage: `basename $0` -D Directory Manager DN -Y Secrets File [ -I instanceRoot ] [ -n =>> localNewTopology ]  [ -r =>> localUseReplGrps ]"
 
-while getopts hD:Y:I:n OPT; do
+while getopts hD:Y:I:nr OPT; do
     case "$OPT" in
         h)
             echo $USAGE
@@ -54,6 +55,9 @@ while getopts hD:Y:I:n OPT; do
             ;;
         n)
             localNewTopology=true
+            ;;
+        r)
+            localUseReplGrps=true
             ;;
         \?)
             # getopts issues an error message
@@ -336,15 +340,17 @@ replicateWithExternalRS()
                 --trustAll --no-prompt
             fi
 
-            echo "#### Setting up set-replication-server-prop - group-id: ${replGrpIdx}, rsServer: ${rsServer}"
-            sudo -u ${OPENDJ_USER} ${OPENDJ_HOME_DIR}/bin/dsconfig set-replication-server-prop \
-            --hostname "${rsServer}"            \
-            --port "${OPENDJ_ADMIN_PORT}"       \
-            --bindDN "${localDirMgrDN}"         \
-            --bindPassword "${localDirMgrPasswd}"         \
-            --provider-name "Multimaster Synchronization" \
-            --set group-id:"${replGrpIdx}"      \
-            --trustAll --no-prompt
+            if [ ${localUseReplGrps} == true ]; then
+                echo "#### Setting up set-replication-server-prop - group-id: ${replGrpIdx}, rsServer: ${rsServer}"
+                sudo -u ${OPENDJ_USER} ${OPENDJ_HOME_DIR}/bin/dsconfig set-replication-server-prop \
+                --hostname "${rsServer}"            \
+                --port "${OPENDJ_ADMIN_PORT}"       \
+                --bindDN "${localDirMgrDN}"         \
+                --bindPassword "${localDirMgrPasswd}"         \
+                --provider-name "Multimaster Synchronization" \
+                --set group-id:"${replGrpIdx}"      \
+                --trustAll --no-prompt
+            fi
         done
     done
 
@@ -401,38 +407,40 @@ replicateWithExternalRS()
                 fi
             fi
 
-            echo "#### Setting up set-replication-domain-prop - baseDN: ${baseDN}, group-id: ${replGrpIdx}, dsServer: ${dsServer}"            
-            sudo -u ${OPENDJ_USER} ${OPENDJ_HOME_DIR}/bin/dsconfig set-replication-domain-prop \
-            --hostname "${dsServer}"            \
-            --port "${OPENDJ_ADMIN_PORT}"       \
-            --bindDN "${localDirMgrDN}"         \
-            --bindPassword "${localDirMgrPasswd}"         \
-            --provider-name "Multimaster Synchronization" \
-            --domain-name "${baseDN}"           \
-            --set group-id:"${replGrpIdx}"      \
-            --trustAll --no-prompt
+            if [ ${localUseReplGrps} == true ]; then
+                echo "#### Setting up set-replication-domain-prop - baseDN: ${baseDN}, group-id: ${replGrpIdx}, dsServer: ${dsServer}"            
+                sudo -u ${OPENDJ_USER} ${OPENDJ_HOME_DIR}/bin/dsconfig set-replication-domain-prop \
+                --hostname "${dsServer}"            \
+                --port "${OPENDJ_ADMIN_PORT}"       \
+                --bindDN "${localDirMgrDN}"         \
+                --bindPassword "${localDirMgrPasswd}"         \
+                --provider-name "Multimaster Synchronization" \
+                --domain-name "${baseDN}"           \
+                --set group-id:"${replGrpIdx}"      \
+                --trustAll --no-prompt
 
-            echo "#### Setting up set-replication-domain-prop - baseDN: cn=schema, group-id: ${replGrpIdx}, dsServer: ${dsServer}"            
-            sudo -u ${OPENDJ_USER} ${OPENDJ_HOME_DIR}/bin/dsconfig set-replication-domain-prop \
-            --hostname "${dsServer}"            \
-            --port "${OPENDJ_ADMIN_PORT}"       \
-            --bindDN "${localDirMgrDN}"         \
-            --bindPassword "${localDirMgrPasswd}"         \
-            --provider-name "Multimaster Synchronization" \
-            --domain-name "cn=schema"           \
-            --set group-id:"${replGrpIdx}"      \
-            --trustAll --no-prompt
+                echo "#### Setting up set-replication-domain-prop - baseDN: cn=schema, group-id: ${replGrpIdx}, dsServer: ${dsServer}"            
+                sudo -u ${OPENDJ_USER} ${OPENDJ_HOME_DIR}/bin/dsconfig set-replication-domain-prop \
+                --hostname "${dsServer}"            \
+                --port "${OPENDJ_ADMIN_PORT}"       \
+                --bindDN "${localDirMgrDN}"         \
+                --bindPassword "${localDirMgrPasswd}"         \
+                --provider-name "Multimaster Synchronization" \
+                --domain-name "cn=schema"           \
+                --set group-id:"${replGrpIdx}"      \
+                --trustAll --no-prompt
 
-            echo "#### Setting up set-replication-domain-prop - baseDN: cn=admin data, group-id: ${replGrpIdx}, dsServer: ${dsServer}"            
-            sudo -u ${OPENDJ_USER} ${OPENDJ_HOME_DIR}/bin/dsconfig set-replication-domain-prop \
-            --hostname "${dsServer}"            \
-            --port "${OPENDJ_ADMIN_PORT}"       \
-            --bindDN "${localDirMgrDN}"         \
-            --bindPassword "${localDirMgrPasswd}"         \
-            --provider-name "Multimaster Synchronization" \
-            --domain-name "cn=admin data"       \
-            --set group-id:"${replGrpIdx}"      \
-            --trustAll --no-prompt
+                echo "#### Setting up set-replication-domain-prop - baseDN: cn=admin data, group-id: ${replGrpIdx}, dsServer: ${dsServer}"            
+                sudo -u ${OPENDJ_USER} ${OPENDJ_HOME_DIR}/bin/dsconfig set-replication-domain-prop \
+                --hostname "${dsServer}"            \
+                --port "${OPENDJ_ADMIN_PORT}"       \
+                --bindDN "${localDirMgrDN}"         \
+                --bindPassword "${localDirMgrPasswd}"         \
+                --provider-name "Multimaster Synchronization" \
+                --domain-name "cn=admin data"       \
+                --set group-id:"${replGrpIdx}"      \
+                --trustAll --no-prompt
+            fi
         done
     done
 }
