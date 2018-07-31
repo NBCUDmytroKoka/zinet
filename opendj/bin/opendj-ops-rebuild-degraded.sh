@@ -33,10 +33,11 @@ fi
 localBackendIdxList=
 localTargetHostList=$(hostname)
 localOfflineMode=false
+localRebuildMode=--rebuildDegraded
 
-USAGE="	Usage: `basename $0` [ -I instanceRoot ] [ -n localTargetHostList=$(hostname) ] [ -m (offline) ]"
+USAGE="	Usage: `basename $0` [ -I instanceRoot ] [ -n localTargetHostList=$(hostname) ] [ -m (offline) ] [ -a (rebuildall) ]"
 
-while getopts hI:n:m OPT; do
+while getopts hI:n:ma OPT; do
     case "$OPT" in
         h)
             echo $USAGE
@@ -50,6 +51,9 @@ while getopts hI:n:m OPT; do
             ;;
         m)
             localOfflineMode=true
+            ;;
+        a)
+            localRebuildMode=--rebuildAll
             ;;
         \?)
             # getopts issues an error message
@@ -86,13 +90,6 @@ for f in ${opendjCfgDir}/opendj-*-override.properties; do source $f; done 2> /de
 
 localLDAPBindDN=$(netrcGetLogin ${opendjCfgDir}/.netrc "OpenDJ_Root")
 localLDAPBindPW=$(netrcGetPasswd ${opendjCfgDir}/.netrc "OpenDJ_Root")
-
-serviceName=opendj
-if [ ! -z "${OPENDJ_SCV_NAME}" ]; then
-    serviceName="${OPENDJ_SCV_NAME}"
-elif [ ! -z "${instanceRoot}" ]; then
-    serviceName="${instanceRoot}"
-fi
 
 time {
 
