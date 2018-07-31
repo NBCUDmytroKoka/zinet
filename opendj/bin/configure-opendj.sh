@@ -161,6 +161,10 @@ echo "#### Creating Log Publishers"
 sudo -u "${ziAdmin}" ${OPENDJ_TOOLS_DIR}/bin/opendj-setup-log-publisher.sh -n ${localHostName} ${instanceOpts}
 echo
 
+echo "#### Setting up *-ds.ldif configuration"
+sudo -u "${ziAdmin}" ${OPENDJ_TOOLS_DIR}/bin/opendj-setup-dsldif.sh ${instanceOpts}
+echo
+
 if [ ! -z "${OPENDJ_GLOBAL_SMTP_SVR}" ]; then
     echo "#### Enabling global SMTP server: ${OPENDJ_GLOBAL_SMTP_SVR}"
     ${OPENDJ_HOME_DIR}/bin/dsconfig set-global-configuration-prop \
