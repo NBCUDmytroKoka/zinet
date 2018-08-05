@@ -34,10 +34,11 @@ localBackendIdxList=
 localTargetHostList=$(hostname)
 localOfflineMode=false
 localRebuildMode=--rebuildDegraded
+localCheckConflicted=false
 
-USAGE="	Usage: `basename $0` [ -I instanceRoot ] [ -n localTargetHostList=$(hostname) ] [ -m (offline) ] [ -a (rebuildall) ]"
+USAGE="	Usage: `basename $0` [ -I instanceRoot ] [ -n localTargetHostList=$(hostname) ] [ -m (offline) ] [ -a (rebuildall) ] [ -c (checkconflicted) ]"
 
-while getopts hI:n:ma OPT; do
+while getopts hI:n:mac OPT; do
     case "$OPT" in
         h)
             echo $USAGE
@@ -54,6 +55,9 @@ while getopts hI:n:ma OPT; do
             ;;
         a)
             localRebuildMode=--rebuildAll
+            ;;
+        c)
+            localCheckConflicted=true
             ;;
         \?)
             # getopts issues an error message
@@ -96,13 +100,27 @@ time {
 if ${localOfflineMode}; then
     echo "#### Building degraded indicies offline"
 
+    if [ "${localCheckConflicted}" == true ]; then
+        for backendId in "${!OPENDJ_BASE_DNS[@]}"; do
+            baseDN=${OPENDJ_BASE_DNS[$backendId]}
+            conflictedStr=$(${OPENDJ_TOOLS_DIR}/bin/opendj-ops-manage-conflicted.sh -b "${baseDN}" -d | grep -v '^#' | sed '/^\s*$/d')
+            if [ -n "{conflictedStr}" ]; then
+                echo "#### $(hostname -s) has conflicted entries in baseDN: $baseDN. Must be cleaned up before indexes can be rebuilt"
+                echo "#### run the following again and try - ${OPENDJ_TOOLS_DIR}/bin/opendj-ops-manage-conflicted.sh -b '${baseDN}' -a"
+                echo "#### conflictedStr:"
+                echo "${conflictedStr}"
+                exit 1
+            fi
+        done
+    fi
+
     ${OPENDJ_TOOLS_DIR}/bin/opendj-ops-control.sh stopWait ${instanceRoot}
 
     for backendId in "${!OPENDJ_BASE_DNS[@]}"; do
         baseDN=${OPENDJ_BASE_DNS[$backendId]}
 
         echo "#### Processing baseDN: ${baseDN}"
-        ${OPENDJ_HOME_DIR}/bin/rebuild-index --baseDN "${baseDN}" --rebuildDegraded --offline
+        ${OPENDJ_HOME_DIR}/bin/rebuild-index --baseDN "${baseDN}" ${localRebuildMode} --offline
         echo
 
         echo "#### Current status"
@@ -116,6 +134,20 @@ else
     IFS=' ' read -ra targetHostList  <<< "${localTargetHostList}"
     for localTargetHost in "${targetHostList[@]}"; do
 
+        if [ "${localCheckConflicted}" == true ]; then
+            for backendId in "${!OPENDJ_BASE_DNS[@]}"; do
+                baseDN=${OPENDJ_BASE_DNS[$backendId]}
+                conflictedStr=$(${OPENDJ_TOOLS_DIR}/bin/opendj-ops-manage-conflicted.sh -b "${baseDN}" -n "${localTargetHost}" -d | grep -v '^#' | sed '/^\s*$/d')
+                if [ -n "{conflictedStr}" ]; then
+                echo "#### $(hostname -s) has conflicted entries in baseDN: $baseDN on localTargetHost: $localTargetHost. Must be cleaned up before indexes can be rebuilt"
+                    echo "#### run the following again and try - ${OPENDJ_TOOLS_DIR}/bin/opendj-ops-manage-conflicted.sh -b '${baseDN}' -a"
+                    echo "#### conflictedStr:"
+                    echo "${conflictedStr}"
+                    exit 1
+                fi
+            done
+        fi
+
         echo "#### Rebuilding degraded index for host: ${localTargetHost}"
         for backendId in "${!OPENDJ_BASE_DNS[@]}"; do
             baseDN=${OPENDJ_BASE_DNS[$backendId]}
@@ -127,7 +159,7 @@ else
                 --bindDN "${localLDAPBindDN}"       \
                 --bindPassword "${localLDAPBindPW}" \
                 --baseDN "${baseDN}"                \
-                --rebuildDegraded                   \
+                ${localRebuildMode}                 \
                 --trustAll
         done
     done

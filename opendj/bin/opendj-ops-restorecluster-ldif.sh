@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -x
 
 ################################################
 #   Copyright (c) 2015-18 zibernetics, Inc.
@@ -28,11 +28,13 @@ ldifFile=
 hostList=
 baseDN=
 sharedBackupDir=
+backendId=
 : ${instanceRoot=}
+includeBranch=
 
-USAGE=" Usage: `basename $0` -L ldifFile -i hostList -b baseDN [ -I instanceRoot ] [ -t sharedBackupDir ]"
+USAGE=" Usage: `basename $0` -L ldifFile -i hostList -b includeBranch -n backendId [ -I instanceRoot ] [ -t sharedBackupDir ]"
 
-while getopts hL:i:b:n:I:t: OPT; do
+while getopts hL:i:b:n:I:t:n: OPT; do
     case "$OPT" in
         h)
             echo $USAGE
@@ -46,10 +48,13 @@ while getopts hL:i:b:n:I:t: OPT; do
             hostList="$OPTARG"
             ;;
         b)
-            baseDN="$OPTARG"
+            includeBranch="$OPTARG"
             ;;
         t)
             sharedBackupDir="$OPTARG"
+            ;;
+        n)
+            backendId="$OPTARG"
             ;;
         I)
             instanceRoot="$OPTARG"
@@ -77,8 +82,15 @@ if [ -z "${hostList}" ]; then
     exit 1
 fi
 
-if [ -z "${baseDN}" ]; then
-    echo "Must pass a baseDN"
+if [ -z "${includeBranch}" ]; then
+    echo "Must pass a includeBranch"
+    echo $USAGE >&2
+    cd ${SAVE_DIR}
+    exit 1
+fi
+
+if [ -z "${backendId}" ]; then
+    echo "Must pass a backendId"
     echo $USAGE >&2
     cd ${SAVE_DIR}
     exit 1
@@ -145,19 +157,18 @@ for f in ${opendjCfgDir}/*.functions; do source $f; done 2> /dev/null
 for f in ${opendjCfgDir}/opendj-*-default.properties; do source $f; done 2> /dev/null
 for f in ${opendjCfgDir}/opendj-*-override.properties; do source $f; done 2> /dev/null
 
+baseDN=
 for i in "${!OPENDJ_BASE_DNS[@]}"; do
-   if [ ${OPENDJ_BASE_DNS[$i]} = ${baseDN} ]; then
-       backendId=$i
+   if [ "${i}" == "${backendId}" ]; then
+       baseDN=${OPENDJ_BASE_DNS[${i}]}
    fi
 done
 
-if [ -z "${backendId}" ]; then
+if [ -z "${baseDN}" ]; then
     echo "No BackendID found correlating baseDN (${baseDN}) in the local configuration."
     cd ${SAVE_DIR}
     exit 1
 fi
-
-echo "backendId: $backendId"
 
 echo "#### Retrieving credentials"
 dirMgrId=$(netrcGetLogin ${opendjCfgDir}/.netrc "OpenDJ_Root")
@@ -194,7 +205,7 @@ if [ ! -z "${ldifFile}" ]; then
     --bindDN "${dirMgrId}"             \
     --bindPassword "${dirMgrPasswd}"   \
     --backendID ${backendId}           \
-    --includeBranch ${baseDN}          \
+    --includeBranch ${includeBranch}   \
     --ldifFile ${ldifFile}             \
     --trustall
 fi

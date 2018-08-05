@@ -87,7 +87,6 @@ PASSWORD=$(netrcGetPasswd ${opendjCfgDir}/.netrc "OpenDJ_Root")
 ADMIN_DN=$(netrcGetLogin ${opendjCfgDir}/.netrc "OpenDJ_Admin")
 ADMIN_PASSWORD=$(netrcGetPasswd ${opendjCfgDir}/.netrc "OpenDJ_Admin")
 
-BASE_DN=${OPENDJ_NBC_BASE_DN}
 ADMIN_PORT=${OPENDJ_ADMIN_PORT}
 LDAP_PORT=${OPENDJ_LDAP_PORT}
 unset OPENDJ_JAVA_ARGS
