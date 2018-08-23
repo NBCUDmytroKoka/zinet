@@ -143,13 +143,13 @@ replicateSimple()
             if [ $? -eq 0 ] && [ -n "${replTopologyAll}" ]; then
                 ##############################################################################
                 # filter Directory Server hosts already in the topology
-                replTopologyDS=$(echo "${replTopologyAll}"  | grep "(5)" | grep "^${baseDN}" | awk -F: '{ print (length($6)>0 ? $2:"") }' | sort -u | tr -d ' ' | sed '/^$/d')
+                replTopologyDS=$(echo "${replTopologyAll}"  | grep "^${baseDN}" | awk -F: '{if ($8 ~ /[0-9]/) {print $2}}' | sort -u | tr -d ' ' | sed '/^$/d')
 
                 # noe set the variables for primary (a replicated server) and slaves (list of new servers that have to be replicated)
                 primary="${targetServer}"
                 if [ -n "${replTopologyDS}" ]; then
                     # filter directory servers in the current replication group that aren't in the topology
-                    slaves=$(comm -13 <(echo "${replTopologyDS}") <(echo "${groupServers}" | tr ',' '\n') | tr -d ' ' | tr '\n' ' ')
+                    slaves=$(comm -13 <(echo "${replTopologyDS}") <(echo "${groupServers}" | tr ',' '\n') | tr -d ' ' | tr '\n' ' ' | xargs echo -n)
                 else
                     # otherwise, add the entire list of servers to the replication topology
                     slaves=$(echo "${groupServers}" | tr ',' ' ')
@@ -210,7 +210,6 @@ replicateSimple()
         done
     else
         echo "#### Did not find any replication configuration for ${baseDN}"
-        break
     fi
 
     if ${replStarted}; then
@@ -295,7 +294,7 @@ replicateWithExternalRS()
                 if [ $? -eq 0 ] && [ -n "${replTopologyAll}" ]; then
                     ##############################################################################
                     # filter Directory Server hosts already in the topology
-                    replTopologyDS=$(echo "${replTopologyAll}"  | grep "(5)" | grep "^${baseDN}" | awk -F: '{ print (length($6)>0 ? $2:"") }' | sort -u | tr -d ' ' | sed '/^$/d')
+                    replTopologyDS=$(echo "${replTopologyAll}" | grep "(5)" | grep "^${baseDN}" | awk -F: '{ print (length($6)>0 ? $2:"") }' | sort -u | tr -d ' ' | sed '/^$/d')
                     [ -n "${replTopologyDS}" ] && OPENDJ_DS_SEED=$(echo "${replTopologyDS}" | head -1)
 
                     ##############################################################################
