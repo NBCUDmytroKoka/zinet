@@ -543,7 +543,7 @@ if [ -z "${localAdminPasswd}" ]; then
     exit 103
 fi
 
-needsProcess=true
+wasProcessed=false
 for theBackend in "${!OPENDJ_BASE_DNS[@]}"; do
     theBaseDN=${OPENDJ_BASE_DNS[$theBackend]}
 
@@ -553,12 +553,12 @@ for theBackend in "${!OPENDJ_BASE_DNS[@]}"; do
         replicateSimple "${theBaseDN}"
     fi
 
-    needsProcess=false
+    wasProcessed=true
 done
 
-if ${needsProcess}; then
+if [ ${wasProcessed} == false ]; then
     for theBackend in "${!OPENDJ_REPL_BASE_DNS[@]}"; do
-        theBaseDN=${OPENDJ_BASE_DNS[$theBackend]}
+        theBaseDN=${OPENDJ_REPL_BASE_DNS[$theBackend]}
 
         if [ -n "${OPENDJ_RS_SEED}" ]; then
             replicateWithExternalRS "${theBaseDN}"
@@ -568,23 +568,21 @@ if ${needsProcess}; then
     done
 fi
 
-if ! ${needsProcess}; then
-    echo "#### Showing Replication Status"
-    ${OPENDJ_HOME_DIR}/bin/dsreplication status \
-        --port ${OPENDJ_ADMIN_PORT}     \
-        --adminUID "${localAdminDN}"    \
-        --adminPassword "${localAdminPasswd}" \
-        -X -n 2> /dev/null
+echo "#### Showing Replication Status"
+${OPENDJ_HOME_DIR}/bin/dsreplication status \
+    --port ${OPENDJ_ADMIN_PORT}     \
+    --adminUID "${localAdminDN}"    \
+    --adminPassword "${localAdminPasswd}" \
+    -X -n 2> /dev/null
 
-    echo "#### Showing Replication Domains"
-    ${OPENDJ_HOME_DIR}/bin/dsconfig list-replication-domains \
-        --port ${OPENDJ_ADMIN_PORT}                     \
-        --bindDN "${localDirMgrDN}"                     \
-        --bindPassword "${localDirMgrPasswd}"           \
-        --provider-name "Multimaster Synchronization"   \
-        --no-prompt --trustAll
+echo "#### Showing Replication Domains"
+${OPENDJ_HOME_DIR}/bin/dsconfig list-replication-domains \
+    --port ${OPENDJ_ADMIN_PORT}                     \
+    --bindDN "${localDirMgrDN}"                     \
+    --bindPassword "${localDirMgrPasswd}"           \
+    --provider-name "Multimaster Synchronization"   \
+    --no-prompt --trustAll
 
-    echo "#### Finished setting up OpenDJ"
-fi
+echo "#### Finished setting up OpenDJ"
 
 cd ${SAVE_DIR}
