@@ -543,7 +543,7 @@ if [ -z "${localAdminPasswd}" ]; then
     exit 103
 fi
 
-needsProcess=true
+wasProcessed=false
 for theBackend in "${!OPENDJ_BASE_DNS[@]}"; do
     theBaseDN=${OPENDJ_BASE_DNS[$theBackend]}
 
@@ -553,22 +553,10 @@ for theBackend in "${!OPENDJ_BASE_DNS[@]}"; do
         replicateSimple "${theBaseDN}"
     fi
 
-    needsProcess=false
+    wasProcessed=true
 done
 
-if ${needsProcess}; then
-    for theBackend in "${!OPENDJ_REPL_BASE_DNS[@]}"; do
-        theBaseDN=${OPENDJ_BASE_DNS[$theBackend]}
-
-        if [ -n "${OPENDJ_RS_SEED}" ]; then
-            replicateWithExternalRS "${theBaseDN}"
-        else
-            replicateSimple "${theBaseDN}"
-        fi
-    done
-fi
-
-if ! ${needsProcess}; then
+if ${wasProcessed}; then
     echo "#### Showing Replication Status"
     ${OPENDJ_HOME_DIR}/bin/dsreplication status \
         --port ${OPENDJ_ADMIN_PORT}     \
