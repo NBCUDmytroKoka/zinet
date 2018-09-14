@@ -24,31 +24,18 @@ DIRNAME=$(basename ${SCRIPTPATH})
 SAVE_DIR=$(pwd)
 cd ${SCRIPTPATH}
 
-if [[ $(id -un) != root ]]; then
-		echo "This script must be run as root."
-		exit
-fi
-
-localDirMgrDN=
-localSecretsFile=
 : ${instanceRoot=}
 localNewTopology=false
 localUseReplGrps=false
 
-USAGE="	Usage: `basename $0` -D Directory Manager DN -Y Secrets File [ -I instanceRoot ] [ -n =>> localNewTopology ]  [ -r =>> localUseReplGrps ]"
+USAGE="	Usage: `basename $0` [ -I instanceRoot ] [ -n =>> localNewTopology ]  [ -r =>> localUseReplGrps ]"
 
-while getopts hD:Y:I:nr OPT; do
+while getopts hI:nr OPT; do
     case "$OPT" in
         h)
             echo $USAGE
             cd ${SAVE_DIR}
             exit 0
-            ;;
-        D)
-            localDirMgrDN="$OPTARG"
-            ;;
-        Y)
-            localSecretsFile="$OPTARG"
             ;;
         I)
             instanceRoot="$OPTARG"
@@ -68,38 +55,6 @@ while getopts hD:Y:I:nr OPT; do
     esac
 done
 
-if [ -z "${localDirMgrDN}" ]; then
-	echo "Must pass a valid admin bind dn"
-    echo $USAGE >&2
-    cd ${SAVE_DIR}
-    exit 1
-fi
-
-if [ -z "${localSecretsFile}" ] || [ ! -f "${localSecretsFile}" ]; then
-	echo "Must pass a valid secrets file"
-    echo $USAGE >&2
-    cd ${SAVE_DIR}
-    exit 1
-fi
-
-source "${localSecretsFile}"
-localDirMgrPasswd="${OPENDJ_DS_DIRMGRPASSWD}"
-localAdminPasswd="${OPENDJ_ADM_PASSWD}"
-
-if [ -z "${localDirMgrPasswd}" ]; then
-	echo "Must pass a valid directory manager password or password file"
-    echo $USAGE >&2
-    cd ${SAVE_DIR}
-    exit 1
-fi
-
-if [ -z "${localAdminPasswd}" ]; then
-	echo "Must pass a valid admin password or password file"
-    echo $USAGE >&2
-    cd ${SAVE_DIR}
-    exit 1
-fi
-
 ################################################
 #
 #	Functions
@@ -111,18 +66,10 @@ fi
 #	replicateSimple
 #   Handles simple replication of a topology, the combines replication servers and
 #   directory servers (on the same host) together.
-#     OPENDJ_REPLGRP1_PRIMARY=
-#     OPENDJ_REPLGRP1_SLAVE1=
-#     OPENDJ_REPLGRP1_SLAVE2=
-#     OPENDJ_REPLGRP1_SLAVE3=
-#     OPENDJ_REPLGRP1_SLAVE4=
-#     OPENDJ_REPLGRP1_SLAVE5=
-#
-#   PRIMARY is the address of the main replication server to configure the cluster
-#   REPLGRP* is a replication topology where groups of servers are distinct. 
-#   This can be increasing, e.g. OPENDJ_REPLGRP1, OPENDJ_REPLGRP2. NOTE: each "group"
-#   actually represents a separate replication topology
-#   SLAVE* is a node in the replication topology
+#     OPENDJ_SERVER_1_IP=
+#     OPENDJ_SERVER_2_IP=
+#     OPENDJ_SERVER_3_IP=
+#     ...
 #
 ################################################
 
@@ -133,72 +80,142 @@ replicateSimple()
     echo "#### Attempting to start replicateSimple baseDN: $baseDN"
     local replStarted=false
     local replList=
+    local primary=
+    local slaves=
+    local slave=
+    local varName=
+    local ipIdx=
 
-    local replGrpIdx=1
-    while true; do
-        local varReplGroup="OPENDJ_REPLGRP${replGrpIdx}"
-        replGrpIdx=$((replGrpIdx+1))
+    if ${localNewTopology}; then
+        echo "#### Setting up new replication topology"
 
-        local varName="${varReplGroup}_PRIMARY"
-        local primary=${!varName}
-
-        if [ ! -z "${primary}" ]; then
-            replList="${primary}"
-
-            local slaveIdx=1
-
-            while true; do
-                varName="${varReplGroup}_SLAVE${slaveIdx}"
-                local slave=${!varName}
-                slaveIdx=$((slaveIdx+1))
-
-                if [ ! -z "${slave}" ]; then
-                    replList="${replList} ${slave}"
-                
-                    echo "#### Creating Replication baseDN:${baseDN} ==> Primary:${primary} to Slave:${slave}"
-                    sudo -u ${OPENDJ_USER} ${OPENDJ_HOME_DIR}/bin/dsreplication configure \
-                    --adminUID admin                            \
-                    --adminPassword "${localAdminPasswd}"       \
-                    --baseDN "${baseDN}"                        \
-                    --host1 "${primary}"                        \
-                    --port1 "${OPENDJ_ADMIN_PORT}"              \
-                    --bindDN1 "${localDirMgrDN}"                \
-                    --bindPassword1 "${localDirMgrPasswd}"      \
-                    --secureReplication1                        \
-                    --replicationPort1 "${OPENDJ_REPL_PORT}"    \
-                    --host2 "${slave}"                          \
-                    --port2 "${OPENDJ_ADMIN_PORT}"              \
-                    --bindDN2 "${localDirMgrDN}"                \
-                    --bindPassword2 "${localDirMgrPasswd}"      \
-                    --secureReplication2                        \
-                    --replicationPort2 "${OPENDJ_REPL_PORT}"    \
-                    --trustAll --no-prompt
-
-                    echo "#### Initializing Replication baseDN:${baseDN} ==> Primary:${primary} to Slave:${slave}"
-                    sudo -u ${OPENDJ_USER} ${OPENDJ_HOME_DIR}/bin/dsreplication initialize \
-                    --adminUID admin                        \
-                    --adminPassword "${localAdminPasswd}"   \
-                    --baseDN "${baseDN}"                    \
-                    --hostSource "${primary}"               \
-                    --portSource "${OPENDJ_ADMIN_PORT}"     \
-                    --hostDestination "${slave}"            \
-                    --portDestination "${OPENDJ_ADMIN_PORT}" \
-                    --trustAll --no-prompt
-
-                    replStarted=true
-                else
-                    break
-                fi
-            done
-        else
-            echo "#### Did not find any replication configuration for ${baseDN} / ${varName}"
-            break
+        primary=${OPENDJ_SERVER_1_IP}
+        if [ -z "${primary}" ]; then
+            echo "#### Error - can't find primary server to replicate"
+            exit 30
         fi
-    done
+
+        # get the remainder of the servers to replicate 
+        ipIdx=2
+        while true; do
+            varName="OPENDJ_SERVER_${ipIdx}_IP"
+            slave=${!varName}
+            [ -z "${slave}" ] && break
+
+            [ -z "${slaves}" ] && slaves="${slave}" || slaves="${slaves} ${slave}"
+            ipIdx=$((ipIdx+1))
+        done
+
+        if [ -z "${slaves}" ]; then
+            echo "#### Error - can't find slave servers to replicate"
+            exit 31
+        fi
+    else
+        echo "#### Adding to existing replication topology"
+
+        # build the list of all servers
+        ipIdx=1
+        groupServers=
+        while true; do
+            varName="OPENDJ_SERVER_${ipIdx}_IP"
+            theServer=${!varName}
+            [ -z "${theServer}" ] && break
+
+            [ -z "${groupServers}" ] && groupServers="${theServer}" || groupServers="${groupServers},${theServer}"
+            ipIdx=$((ipIdx+1))
+        done
+
+        ### iterate the list of RS servers and find one that's configured. Use it as the seed server
+        local hasTopology=false
+        local ipIdx=1
+        while true; do
+            local varName="OPENDJ_SERVER_${ipIdx}_IP"
+            targetServer=${!varName}
+            [ -z "${targetServer}" ] && break
+
+            echo "#### checking to see if replication server: ${targetServer} can be seed rs"
+            replTopologyAll=$(${OPENDJ_HOME_DIR}/bin/dsreplication status \
+                    --hostname "${targetServer}"    \
+                    --port "${OPENDJ_ADMIN_PORT}"   \
+                    --adminUID "${localAdminDN}"    \
+                    --adminPassword "${localAdminPasswd}" \
+                    --no-prompt --trustall)
+            if [ $? -eq 0 ] && [ -n "${replTopologyAll}" ]; then
+                ##############################################################################
+                # filter Directory Server hosts already in the topology
+                replTopologyDS=$(echo "${replTopologyAll}"  | grep "^${baseDN}" | awk -F: '{if ($8 ~ /[0-9]/) {print $2}}' | sort -u | tr -d ' ' | sed '/^$/d')
+
+                # noe set the variables for primary (a replicated server) and slaves (list of new servers that have to be replicated)
+                primary="${targetServer}"
+                if [ -n "${replTopologyDS}" ]; then
+                    # filter directory servers in the current replication group that aren't in the topology
+                    slaves=$(comm -13 <(echo "${replTopologyDS}") <(echo "${groupServers}" | tr ',' '\n') | tr -d ' ' | tr '\n' ' ' | xargs echo -n)
+                else
+                    # otherwise, add the entire list of servers to the replication topology
+                    slaves=$(echo "${groupServers}" | tr ',' ' ')
+                fi
+
+                hasTopology=true
+                break
+            fi
+
+            ipIdx=$((ipIdx+1))
+        done
+        
+        if ! $hasTopology; then
+            echo "#### Error - can't find existing topology to add replication configuration. Exiting..."
+            exit 32
+        fi
+    fi
+
+    if [ ! -z "${primary}" ]; then
+        replList="${primary}"
+
+        for slave in ${slaves}; do
+            replList="${replList} ${slave}"
+    
+            echo "#### Creating Replication baseDN:${baseDN} ==> primary:${primary} to Slave:${slave}"
+            ${OPENDJ_HOME_DIR}/bin/dsreplication configure \
+            --adminUID "${localAdminDN}"                \
+            --adminPassword "${localAdminPasswd}"       \
+            --baseDN "${baseDN}"                        \
+            --host1 "${primary}"                        \
+            --port1 "${OPENDJ_ADMIN_PORT}"              \
+            --bindDN1 "${localDirMgrDN}"                \
+            --bindPassword1 "${localDirMgrPasswd}"      \
+            --secureReplication1                        \
+            --replicationPort1 "${OPENDJ_REPL_PORT}"    \
+            --host2 "${slave}"                          \
+            --port2 "${OPENDJ_ADMIN_PORT}"              \
+            --bindDN2 "${localDirMgrDN}"                \
+            --bindPassword2 "${localDirMgrPasswd}"      \
+            --secureReplication2                        \
+            --replicationPort2 "${OPENDJ_REPL_PORT}"    \
+            --trustAll --no-prompt
+
+            if ${localNewTopology}; then
+                echo "#### Initializing Replication baseDN:${baseDN} ==> primary:${primary} to Slave:${slave}"
+                ${OPENDJ_HOME_DIR}/bin/dsreplication initialize \
+                --adminUID "${localAdminDN}"            \
+                --adminPassword "${localAdminPasswd}"   \
+                --baseDN "${baseDN}"                    \
+                --hostSource "${primary}"               \
+                --portSource "${OPENDJ_ADMIN_PORT}"     \
+                --hostDestination "${slave}"            \
+                --portDestination "${OPENDJ_ADMIN_PORT}" \
+                --trustAll --no-prompt
+            fi
+
+            replStarted=true
+        done
+    else
+        echo "#### Did not find any replication configuration for ${baseDN}"
+    fi
 
     if ${replStarted}; then
         echo "#### post-replication started = configuring replication domain properties"
-        sudo -u ${ziAdmin} ${OPENDJ_TOOLS_DIR}/bin/opendj-setup-replication-domain.sh -n "${replList}" ${instanceOpts}
+        ${OPENDJ_TOOLS_DIR}/bin/opendj-setup-replication-domain.sh -n "${replList}" ${instanceOpts}
+        ${OPENDJ_TOOLS_DIR}/bin/opendj-setup-replication-server.sh -n "${replList}" ${instanceOpts}
     fi
 }
 
@@ -220,7 +237,7 @@ replicateWithExternalRS()
     local replTopologyRS=
     local targetServers=
     local replTopologyAll=
-    local replGrpIdx=
+    local replGrpIdx=    
     
     if [ ${localNewTopology} == true ]; then
 
@@ -239,8 +256,8 @@ replicateWithExternalRS()
         ## initialize the replication servers and directory servers
         ##############################################################################
         echo "#### New replication topology - setting up DS ($OPENDJ_DS_SEED) and RS ($OPENDJ_RS_SEED) seed servers."
-        sudo -u ${OPENDJ_USER} ${OPENDJ_HOME_DIR}/bin/dsreplication configure \
-        --adminUID admin                        \
+        ${OPENDJ_HOME_DIR}/bin/dsreplication configure \
+        --adminUID "${localAdminDN}"            \
         --adminPassword "${localAdminPasswd}"   \
         --baseDN "${baseDN}"                    \
         --host1 "${OPENDJ_RS_SEED}"             \
@@ -260,7 +277,7 @@ replicateWithExternalRS()
 
     else
         ### iterate the list of RS servers and find one that's configured. Use it as the seed server
-        bDone=false
+        local hasTopology=false
         for replGrpIdx in $(echo "${OPENDJ_REPL_GRPS}" | sed "s/,/ /g"); do
             local varReplGroup="OPENDJ_RS_RG${replGrpIdx}"
             local groupServers=${!varReplGroup}
@@ -268,39 +285,42 @@ replicateWithExternalRS()
 
             for rsServer in $(echo "${groupServers}" | sed "s/,/ /g"); do
                 echo "#### checking to see if replication server: ${rsServer} can be seed rs"
-                replTopologyAll=$(sudo -u ${OPENDJ_USER} ${OPENDJ_HOME_DIR}/bin/dsreplication status \
-                        --hostname "${rsServer}"    \
-                        --port "${OPENDJ_ADMIN_PORT}" \
-                        --adminUID admin            \
+                replTopologyAll=$(${OPENDJ_HOME_DIR}/bin/dsreplication status \
+                        --hostname "${rsServer}"        \
+                        --port "${OPENDJ_ADMIN_PORT}"   \
+                        --adminUID "${localAdminDN}"    \
                         --adminPassword "${localAdminPasswd}" \
-                        --no-prompt --trustall | grep "${baseDN}")
+                        --no-prompt --trustall)
                 if [ $? -eq 0 ] && [ -n "${replTopologyAll}" ]; then
                     ##############################################################################
                     # filter Directory Server hosts already in the topology
-                    replTopologyDS=$(echo "${replTopologyAll}" | awk -F: '{ print (length($6)>0 ? $2:"") }' | sort -u | tr -d ' ' | sed '/^$/d')
+                    replTopologyDS=$(echo "${replTopologyAll}" | grep "(5)" | grep "^${baseDN}" | awk -F: '{ print (length($6)>0 ? $2:"") }' | sort -u | tr -d ' ' | sed '/^$/d')
                     [ -n "${replTopologyDS}" ] && OPENDJ_DS_SEED=$(echo "${replTopologyDS}" | head -1)
 
                     ##############################################################################
                     # filter replication servers hosts already in the topology
-                    replTopologyRS=$(echo "${replTopologyAll}" | grep "${OPENDJ_REPL_PORT}" | awk -F: '{ print $2}' | sort -u  | tr -d ' ')
+                    replTopologyRS=$(echo "${replTopologyAll}" | grep "(6)" | grep -w "${OPENDJ_REPL_PORT}" | awk -F: '{ print $2}' | sort -u  | tr -d ' ')
                     OPENDJ_RS_SEED="${rsServer}"
                     
-                    bDone=true
+                    hasTopology=true
                     break
                 fi
             done
-            if $bDone; then
+            if $hasTopology; then
                 break
             fi
         done
         
-        if ! $bDone; then
+        if ! $hasTopology; then
             echo "#### Error - can't find existing topology to add replication configuration. Exiting..."
-            exit 20
+            exit 11
         fi
     fi
 
     ##############################################################################
+    # setup replication servers
+    local replStarted=false
+    local replList=
     for replGrpIdx in $(echo "${OPENDJ_REPL_GRPS}" | sed "s/,/ /g"); do
         echo "#### Starting to add replication servers in group-id: $replGrpIdx to the topology"
         local varReplGroup="OPENDJ_RS_RG${replGrpIdx}"
@@ -316,12 +336,13 @@ replicateWithExternalRS()
         fi
 
         for rsServer in ${targetServers}; do
-
             ### now configure the replication server and seed server
             if [ "${rsServer}" != "${OPENDJ_RS_SEED}" ]; then
+                [ -z "${replList}" ] && replList="${rsServer}" || replList="${replList} ${rsServer}"
+
                 echo "#### Adding replication server - group-id: ${replGrpIdx}, rsServer: ${rsServer}, OPENDJ_RS_SEED: ${OPENDJ_RS_SEED}"
-                sudo -u ${OPENDJ_USER} ${OPENDJ_HOME_DIR}/bin/dsreplication configure \
-                --adminUID admin                            \
+                ${OPENDJ_HOME_DIR}/bin/dsreplication configure \
+                --adminUID "${localAdminDN}"                \
                 --adminPassword "${localAdminPasswd}"       \
                 --baseDN "${baseDN}"                        \
                 --host1 "${OPENDJ_RS_SEED}"                 \
@@ -342,7 +363,7 @@ replicateWithExternalRS()
 
             if [ ${localUseReplGrps} == true ]; then
                 echo "#### Setting up set-replication-server-prop - group-id: ${replGrpIdx}, rsServer: ${rsServer}"
-                sudo -u ${OPENDJ_USER} ${OPENDJ_HOME_DIR}/bin/dsconfig set-replication-server-prop \
+                ${OPENDJ_HOME_DIR}/bin/dsconfig set-replication-server-prop \
                 --hostname "${rsServer}"            \
                 --port "${OPENDJ_ADMIN_PORT}"       \
                 --bindDN "${localDirMgrDN}"         \
@@ -351,11 +372,19 @@ replicateWithExternalRS()
                 --set group-id:"${replGrpIdx}"      \
                 --trustAll --no-prompt
             fi
+            replStarted=true
         done
     done
 
+    if ${replStarted}; then
+        echo "#### post-replication started = configuring replication server properties"
+        ${OPENDJ_TOOLS_DIR}/bin/opendj-setup-replication-server.sh -n "${replList}" ${instanceOpts}
+    fi    
+
     ##############################################################################
-    adminDataSet=false
+    # setup directory servers
+    local replStarted=false
+    local replList=
     for replGrpIdx in $(echo "${OPENDJ_REPL_GRPS}" | sed "s/,/ /g"); do
         echo "#### Starting to add replicas in group-id: $replGrpIdx to the topology"
         local varReplGroup="OPENDJ_DS_RG${replGrpIdx}"
@@ -373,9 +402,11 @@ replicateWithExternalRS()
         for dsServer in ${targetServers}; do
 
             if [ "${dsServer}" != "${OPENDJ_DS_SEED}" ]; then
+                [ -z "${replList}" ] && replList="${rsServer}" || replList="${replList} ${rsServer}"
+
                 echo "#### Adding replica - baseDN: ${baseDN}, group-id: ${replGrpIdx}, dsServer: ${dsServer}, OPENDJ_RS_SEED: ${OPENDJ_RS_SEED}"
-                sudo -u ${OPENDJ_USER} ${OPENDJ_HOME_DIR}/bin/dsreplication configure \
-                --adminUID admin                            \
+                ${OPENDJ_HOME_DIR}/bin/dsreplication configure \
+                --adminUID "${localAdminDN}"                \
                 --adminPassword "${localAdminPasswd}"       \
                 --baseDN "${baseDN}"                        \
                 --host1 "${dsServer}"                       \
@@ -393,10 +424,12 @@ replicateWithExternalRS()
                 --secureReplication2                        \
                 --trustAll --no-prompt
 
+                # if new replication topology, then initialize the dsServer
+                # from the OPENDJ_DS_SEED server
                 if ${localNewTopology}; then
                     echo "#### Initializing replica baseDN:${baseDN} ==>  dsServer: ${dsServer}, OPENDJ_DS_SEED: ${OPENDJ_DS_SEED}"
-                    sudo -u ${OPENDJ_USER} ${OPENDJ_HOME_DIR}/bin/dsreplication initialize \
-                    --adminUID admin                        \
+                    ${OPENDJ_HOME_DIR}/bin/dsreplication initialize \
+                    --adminUID "${localAdminDN}"            \
                     --adminPassword "${localAdminPasswd}"   \
                     --baseDN "${baseDN}"                    \
                     --hostSource "${OPENDJ_DS_SEED}"        \
@@ -405,11 +438,13 @@ replicateWithExternalRS()
                     --portDestination "${OPENDJ_ADMIN_PORT}" \
                     --trustAll --no-prompt
                 fi
+                replStarted=true
             fi
 
+            # if localUseReplGrps is defined, then set group ids
             if [ ${localUseReplGrps} == true ]; then
                 echo "#### Setting up set-replication-domain-prop - baseDN: ${baseDN}, group-id: ${replGrpIdx}, dsServer: ${dsServer}"            
-                sudo -u ${OPENDJ_USER} ${OPENDJ_HOME_DIR}/bin/dsconfig set-replication-domain-prop \
+                ${OPENDJ_HOME_DIR}/bin/dsconfig set-replication-domain-prop \
                 --hostname "${dsServer}"            \
                 --port "${OPENDJ_ADMIN_PORT}"       \
                 --bindDN "${localDirMgrDN}"         \
@@ -420,7 +455,7 @@ replicateWithExternalRS()
                 --trustAll --no-prompt
 
                 echo "#### Setting up set-replication-domain-prop - baseDN: cn=schema, group-id: ${replGrpIdx}, dsServer: ${dsServer}"            
-                sudo -u ${OPENDJ_USER} ${OPENDJ_HOME_DIR}/bin/dsconfig set-replication-domain-prop \
+                ${OPENDJ_HOME_DIR}/bin/dsconfig set-replication-domain-prop \
                 --hostname "${dsServer}"            \
                 --port "${OPENDJ_ADMIN_PORT}"       \
                 --bindDN "${localDirMgrDN}"         \
@@ -431,7 +466,7 @@ replicateWithExternalRS()
                 --trustAll --no-prompt
 
                 echo "#### Setting up set-replication-domain-prop - baseDN: cn=admin data, group-id: ${replGrpIdx}, dsServer: ${dsServer}"            
-                sudo -u ${OPENDJ_USER} ${OPENDJ_HOME_DIR}/bin/dsconfig set-replication-domain-prop \
+                ${OPENDJ_HOME_DIR}/bin/dsconfig set-replication-domain-prop \
                 --hostname "${dsServer}"            \
                 --port "${OPENDJ_ADMIN_PORT}"       \
                 --bindDN "${localDirMgrDN}"         \
@@ -443,6 +478,11 @@ replicateWithExternalRS()
             fi
         done
     done
+
+    if ${replStarted}; then
+        echo "#### post-replication started = configuring replication domain properties"
+        ${OPENDJ_TOOLS_DIR}/bin/opendj-setup-replication-domain.sh -n "${replList}" ${instanceOpts}
+    fi    
 }
 
 ##################################################
@@ -474,6 +514,36 @@ for f in ${opendjCfgDir}/*.functions; do source $f; done 2> /dev/null
 for f in ${opendjCfgDir}/opendj-*-default.properties; do source $f; done 2> /dev/null
 for f in ${opendjCfgDir}/opendj-*-override.properties; do source $f; done 2> /dev/null
 
+if [[ $(id -un) != "${ziAdmin}" ]]; then
+    echo "This script must be run as ${ziAdmin}."
+    exit 99
+fi
+
+localDirMgrDN=$(netrcGetLogin ${opendjCfgDir}/.netrc "OpenDJ_Root")
+if [ -z "${localDirMgrDN}" ]; then
+	echo "localDirMgrDN not found"
+    exit 100
+fi
+
+localDirMgrPasswd=$(netrcGetPasswd ${opendjCfgDir}/.netrc "OpenDJ_Root")
+if [ -z "${localDirMgrPasswd}" ]; then
+	echo "localDirMgrPasswd not found"
+    exit 101
+fi
+
+localAdminDN=$(netrcGetLogin ${opendjCfgDir}/.netrc "OpenDJ_Admin")
+if [ -z "${localAdminDN}" ]; then
+	echo "localAdminDN not found"
+    exit 102
+fi
+
+localAdminPasswd=$(netrcGetPasswd ${opendjCfgDir}/.netrc "OpenDJ_Admin")
+if [ -z "${localAdminPasswd}" ]; then
+	echo "localAdminPasswd not found"
+    exit 103
+fi
+
+wasProcessed=false
 for theBackend in "${!OPENDJ_BASE_DNS[@]}"; do
     theBaseDN=${OPENDJ_BASE_DNS[$theBackend]}
 
@@ -482,17 +552,31 @@ for theBackend in "${!OPENDJ_BASE_DNS[@]}"; do
     else
         replicateSimple "${theBaseDN}"
     fi
+
+    wasProcessed=true
 done
 
+if [ ${wasProcessed} == false ]; then
+    for theBackend in "${!OPENDJ_REPL_BASE_DNS[@]}"; do
+        theBaseDN=${OPENDJ_REPL_BASE_DNS[$theBackend]}
+
+        if [ -n "${OPENDJ_RS_SEED}" ]; then
+            replicateWithExternalRS "${theBaseDN}"
+        else
+            replicateSimple "${theBaseDN}"
+        fi
+    done
+fi
+
 echo "#### Showing Replication Status"
-sudo -u ${OPENDJ_USER} ${OPENDJ_HOME_DIR}/bin/dsreplication status \
-    --port ${OPENDJ_ADMIN_PORT}         \
-    --adminUID admin                    \
+${OPENDJ_HOME_DIR}/bin/dsreplication status \
+    --port ${OPENDJ_ADMIN_PORT}     \
+    --adminUID "${localAdminDN}"    \
     --adminPassword "${localAdminPasswd}" \
     -X -n 2> /dev/null
 
 echo "#### Showing Replication Domains"
-sudo -u ${OPENDJ_USER} ${OPENDJ_HOME_DIR}/bin/dsconfig list-replication-domains \
+${OPENDJ_HOME_DIR}/bin/dsconfig list-replication-domains \
     --port ${OPENDJ_ADMIN_PORT}                     \
     --bindDN "${localDirMgrDN}"                     \
     --bindPassword "${localDirMgrPasswd}"           \

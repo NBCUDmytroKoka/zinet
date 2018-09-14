@@ -1055,29 +1055,9 @@ for serverId in $(grep -e "\[*\]" ${localInventoryFile} | tr -d '[' | tr -d ']' 
             if [  "${REPLICATE_OPENDJ}" == 'new' ]; then
                 replOpts="-n"
             fi
-            
-            echo "#### ${ZINET_TARGET_HOSTNAME} - preparing credentials"
-             [ ! -f .odjpins-${RUNDATE_DATE} ] && copyPasswordFile .odjpins-${RUNDATE_DATE} opendjPasswds "${localSecretsFile}"
 
-            passwordOpts=
-            if [ -f .odjpins-${RUNDATE_DATE} ]; then
-                echo "#### ${ZINET_TARGET_HOSTNAME} - pushing ${gDirMgrDN} credentials"
-                passwordOpts="-D \"${gDirMgrDN}\" -Y ${gRemoteBuildDir}/.odjpins-${RUNDATE_DATE}"
-
-                SCP .odjpins-${RUNDATE_DATE} ${userSSHOpts}${ZINET_TARGET_HOSTNAME}:${gRemoteBuildDir}/
-                [ "${gHaveSudo}" == "true" ] \
-                    && SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "sudo chown root:root ${gRemoteBuildDir}/.odjpins-${RUNDATE_DATE} && sudo chmod 400 ${gRemoteBuildDir}/.odjpins-${RUNDATE_DATE}" \
-                    || SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "chown root:root ${gRemoteBuildDir}/.odjpins-${RUNDATE_DATE} && chmod 400 ${gRemoteBuildDir}/.odjpins-${RUNDATE_DATE}"
-            fi
-
-            [ "${gHaveSudo}" == "true" ] \
-                && SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "sudo ${gRemoteBuildDir}/opendj/bin/replicate-opendj.sh ${instanceOpts} ${replOpts} ${passwordOpts}" \
-                || SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "${gRemoteBuildDir}/opendj/bin/replicate-opendj.sh ${instanceOpts} ${passwordOpts}"
+            SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "${gRemoteBuildDir}/opendj/bin/opendj-ops-replicate.sh ${instanceOpts} ${replOpts}"
             exitOnErr  "$?" "Replicating OpenDJ"
-
-            [ "${gHaveSudo}" == "true" ] \
-                && SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "sudo rm -f ${gRemoteBuildDir}/.odjpins-${RUNDATE_DATE}" \
-                || SSH ${userSSHOpts}${ZINET_TARGET_HOSTNAME} "rm -f ${gRemoteBuildDir}/.odjpins-${RUNDATE_DATE}"            
         fi
 
     else
