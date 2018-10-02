@@ -425,6 +425,9 @@ chmod 640 ${opendjCfgDir}/opendj-*-default.properties
 /bin/cp -f ${SCRIPTPATH}/*.functions ${opendjCfgDir}/
 chmod 640 ${opendjCfgDir}/*.functions
 
+/bin/cp -f ${localConfigDir}/opendj-*-default.properties ${opendjCfgDir}/ 2> /dev/null
+chmod 640 ${opendjCfgDir}/opendj-*-default.properties 2> /dev/null
+
 /bin/cp -f ${localConfigDir}/opendj-*-override.properties ${opendjCfgDir}/ 2> /dev/null
 chmod 640 ${opendjCfgDir}/opendj-*-override.properties 2> /dev/null
 
