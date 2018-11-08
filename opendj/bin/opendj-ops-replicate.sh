@@ -293,13 +293,21 @@ replicateWithExternalRS()
                         --no-prompt --trustall)
                 if [ $? -eq 0 ] && [ -n "${replTopologyAll}" ]; then
                     ##############################################################################
-                    # filter Directory Server hosts already in the topology
+                    # get Directory Server hosts already in the topology
                     replTopologyDS=$(echo "${replTopologyAll}" | grep "(5)" | grep "^${baseDN}" | awk -F: '{ print (length($6)>0 ? $2:"") }' | sort -u | tr -d ' ' | sed '/^$/d')
                     [ -n "${replTopologyDS}" ] && OPENDJ_DS_SEED=$(echo "${replTopologyDS}" | head -1)
 
                     ##############################################################################
-                    # filter replication servers hosts already in the topology
-                    replTopologyRS=$(echo "${replTopologyAll}" | grep "(6)" | grep -w "${OPENDJ_REPL_PORT}" | awk -F: '{ print $2}' | sort -u  | tr -d ' ')
+                    # get replication servers hosts already in the topology
+                    replTopologyRS=$(${OPENDJ_HOME_DIR}/bin/dsconfig list-replication-domains \
+                            --hostname "${rsServer}"        \
+                            --port "${OPENDJ_ADMIN_PORT}"   \
+                            --bindDN "${localDirMgrDN}"     \
+                            --bindPassword "${localDirMgrPasswd}"         \
+                            --provider-name "Multimaster Synchronization" \
+                            --property replication-server   \
+                            --trustall | grep "${baseDN}" | cut -d: -f2- | tr ',' '\n' | sort -u | tr -d ' ')
+
                     OPENDJ_RS_SEED="${rsServer}"
                     
                     hasTopology=true
@@ -329,7 +337,7 @@ replicateWithExternalRS()
 
         if [ -n "${replTopologyRS}" ]; then
             # filter replication servers in the current replication group that aren't in the topology
-            targetServers=$(comm -13 <(echo "${replTopologyRS}") <(echo "${groupServers}" | tr ',' '\n') | tr -d ' ' | tr '\n' ' ')
+            targetServers=$(comm -13 <(echo "${replTopologyRS}") <(echo "${groupServers}" | tr ',' '\n') | tr -d ' ' | sort -u | tr '\n' ' ')
         else
             # otherwise, add the entire list of servers to the replication topology
             targetServers=$(echo "${groupServers}" | tr ',' ' ')
