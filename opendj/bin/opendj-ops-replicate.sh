@@ -594,4 +594,3 @@ ${OPENDJ_HOME_DIR}/bin/dsconfig list-replication-domains \
 echo "#### Finished setting up OpenDJ"
 
 cd ${SAVE_DIR}
-
