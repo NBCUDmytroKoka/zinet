@@ -10,6 +10,10 @@ set -o pipefail
 # Turn on traces, useful while debugging but commented out by default
 #set -o xtrace
 
+####################################################################
+# With no IP to remove (-L) provided explicitly it will be fetched from dsreplication status error output
+####################################################################
+
 APPLY_CHANGES=0
 BAD_DJ_IP=""
 
@@ -18,8 +22,9 @@ while getopts L:ah option; do
         a) APPLY_CHANGES=1;;
         L) BAD_DJ_IP=${OPTARG};;
         h) echo "=====================USAGE======================"
-           echo "-L  | IP to be cleared from replication topology"
-           echo "-a  | Apply changes. If not set script will only detect and output bad IPs"
+           echo "-L  | (optional) IP to be cleared from replication topology"
+           echo "-a  | (optional) Apply changes. If not set script will only detect and output bad IPs"
+           echo "With no IP to remove (-L) provided explicitly it will be fetched from dsreplication status error output"
            exit 0;;
         *) echo "Invalid Option: -${option} requires an argument" 1>&2
            exit 2;;
@@ -30,11 +35,11 @@ done
 # Functions
 ####################################################################
 
-###################################################################
+####################################################################
 # $1 - target DJ IP on which clearing topology
 # $2 - Bad DJ IP to be removed from topology
 # $3 - domain name 
-##################################################################
+####################################################################
 clear_replication_domain() {
     if [ ${APPLY_CHANGES} = 1 ]; then
         echo Clearing replication domain $3 from $1... 
@@ -48,7 +53,7 @@ clear_replication_domain() {
 ###################################################################
 # $1 - target DJ IP on which clearing topology
 # $2 - Bad DJ IP to be removed from topology
-##################################################################
+###################################################################
 clear_replication_server() {
     if [ ${APPLY_CHANGES} = 1 ]; then
         echo Clearing replication server $2 from $1...
