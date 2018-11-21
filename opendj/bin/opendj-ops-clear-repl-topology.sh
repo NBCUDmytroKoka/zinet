@@ -14,6 +14,7 @@ set -o pipefail
 # With no IP to remove (-L) provided explicitly it will be fetched from dsreplication status error output
 ####################################################################
 
+: ${OPENDJ_HOME_DIR:="/opt/opendj"}
 APPLY_CHANGES=0
 BAD_DJ_IPS=""
 
@@ -44,9 +45,9 @@ clear_replication_domain() {
     if [ ${APPLY_CHANGES} = 1 ]; then
         echo Clearing bad IP $2 from $3 replication domain configuration on $1... 
         EXITCODE=0
-        /opt/opendj/bin/dsconfig set-replication-domain-prop -h ${1} -D "${DIRMGR_DN}" -p ${ADMIN_PORT} -w ${PASSWORD} --provider-name "Multimaster Synchronization" --domain-name "${3}" --remove replication-server:$2:${OPENDJ_REPL_PORT} --no-prompt --trustall || EXITCODE=$?
+        ${OPENDJ_HOME_DIR}/bin/dsconfig set-replication-domain-prop -h ${1} -D "${DIRMGR_DN}" -p ${ADMIN_PORT} -w ${PASSWORD} --provider-name "Multimaster Synchronization" --domain-name "${3}" --remove replication-server:$2:${OPENDJ_REPL_PORT} --no-prompt --trustall || EXITCODE=$?
     else
-        echo "/opt/opendj/bin/dsconfig set-replication-domain-prop -h ${1} -D \"${DIRMGR_DN}\" -p ${ADMIN_PORT} -w <PASSWORD> --provider-name \"Multimaster Synchronization\" --domain-name \"$3\" --remove replication-server:$2:${OPENDJ_REPL_PORT} --no-prompt --trustall"
+        echo "${OPENDJ_HOME_DIR}/bin/dsconfig set-replication-domain-prop -h ${1} -D \"${DIRMGR_DN}\" -p ${ADMIN_PORT} -w <PASSWORD> --provider-name \"Multimaster Synchronization\" --domain-name \"$3\" --remove replication-server:$2:${OPENDJ_REPL_PORT} --no-prompt --trustall"
     fi
 }
 
@@ -58,9 +59,9 @@ clear_replication_server() {
     if [ ${APPLY_CHANGES} = 1 ]; then
         echo Clearing bad IP $2 from replication server configuration on $1...
         EXITCODE=0
-        /opt/opendj/bin/dsconfig set-replication-server-prop -h ${1} -D "${DIRMGR_DN}" -p ${ADMIN_PORT} -w ${PASSWORD} --provider-name "Multimaster Synchronization" --remove replication-server:${2}:${OPENDJ_REPL_PORT} --no-prompt --trustall || EXITCODE=$?
+        ${OPENDJ_HOME_DIR}/bin/dsconfig set-replication-server-prop -h ${1} -D "${DIRMGR_DN}" -p ${ADMIN_PORT} -w ${PASSWORD} --provider-name "Multimaster Synchronization" --remove replication-server:${2}:${OPENDJ_REPL_PORT} --no-prompt --trustall || EXITCODE=$?
     else
-        echo "/opt/opendj/bin/dsconfig set-replication-server-prop -h ${1} -D \"${DIRMGR_DN}\" -p ${ADMIN_PORT} -w <PASSWORD> --provider-name \"Multimaster Synchronization\" --remove replication-server:${2}:${OPENDJ_REPL_PORT} --no-prompt --trustall"
+        echo "${OPENDJ_HOME_DIR}/bin/dsconfig set-replication-server-prop -h ${1} -D \"${DIRMGR_DN}\" -p ${ADMIN_PORT} -w <PASSWORD> --provider-name \"Multimaster Synchronization\" --remove replication-server:${2}:${OPENDJ_REPL_PORT} --no-prompt --trustall"
     fi
 
 }
@@ -75,12 +76,12 @@ clear_admin_data() {
 }
 
 echo Sourcing OpenDJ environment variables
-source <(opendj-ops-env.sh set | grep -E "(PASSWORD|ADMIN_PASSWORD|ADMIN_PORT|HOST_IP|ADMIN_DN|DIRMGR_DN|LDAP_PORT|OPENDJ_REPL_PORT)")
+source <(opendj-ops-env.sh set | grep -E "(^PASSWORD|^ADMIN_PASSWORD|^ADMIN_PORT|^HOST_IP|^ADMIN_DN|^DIRMGR_DN|^LDAP_PORT|^OPENDJ_REPL_PORT|^OPENDJ_HOME_DIR)")
 
 if [ -z ${BAD_DJ_IPS} ]; then
     set +o pipefail
     echo Fetching Bad DJ IPs from dsreplication status error output
-    BAD_DJ_IPS=$(/opt/opendj/bin/dsreplication status -h ${HOST_IP} -I ${ADMIN_DN} --port ${ADMIN_PORT} -w ${ADMIN_PASSWORD} --no-prompt --trustall 2>&1 > /dev/null | grep "Error on " | grep -o -E "[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}" |  sort | uniq )
+    BAD_DJ_IPS=$(${OPENDJ_HOME_DIR}/bin/dsreplication status -h ${HOST_IP} -I ${ADMIN_DN} --port ${ADMIN_PORT} -w ${ADMIN_PASSWORD} --no-prompt --trustall 2>&1 > /dev/null | grep "Error on " | grep -o -E "[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}" |  sort | uniq )
     set -o pipefail
 fi
 
@@ -94,7 +95,7 @@ for bad_dj_ip in ${BAD_DJ_IPS//,/ }; do
 done
 
 echo Getting IPs in replication topology
-TOPOLOGY_DS_IPS=$(/opt/opendj/bin/dsreplication status -h ${HOST_IP} -I ${ADMIN_DN} --port ${ADMIN_PORT} -w ${ADMIN_PASSWORD} --no-prompt --trustall 2>/dev/null | grep -o -E "[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}" | sort | uniq)
+TOPOLOGY_DS_IPS=$(${OPENDJ_HOME_DIR}/bin/dsreplication status -h ${HOST_IP} -I ${ADMIN_DN} --port ${ADMIN_PORT} -w ${ADMIN_PASSWORD} --no-prompt --trustall 2>/dev/null | grep -o -E "[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}" | sort | uniq)
 
 if [ -z "${TOPOLOGY_DS_IPS}" ]
 then
@@ -135,7 +136,7 @@ for bad_dj_ip in ${BAD_DJ_IPS//,/ }; do
     ###############################################################################
     # Clearing replication domains data
     ###############################################################################
-    REPLICATION_DOMAINS=$(/opt/opendj/bin/dsconfig list-replication-domains --provider-name "Multimaster Synchronization" -h $target_dj -D "${DIRMGR_DN}" -p ${ADMIN_PORT} -w ${PASSWORD} --trustAll --script-friendly)
+    REPLICATION_DOMAINS=$(${OPENDJ_HOME_DIR}/bin/dsconfig list-replication-domains --provider-name "Multimaster Synchronization" -h $target_dj -D "${DIRMGR_DN}" -p ${ADMIN_PORT} -w ${PASSWORD} --trustAll --script-friendly)
 
     SAVEIFS=$IFS
     IFS=$'\n'
