@@ -76,7 +76,7 @@ clear_admin_data() {
 }
 
 echo Sourcing OpenDJ environment variables
-source <(opendj-ops-env.sh set | grep -E "(^PASSWORD|^ADMIN_PASSWORD|^ADMIN_PORT|^HOST_IP|^ADMIN_DN|^DIRMGR_DN|^LDAP_PORT|^OPENDJ_REPL_PORT|^OPENDJ_HOME_DIR)")
+source <(opendj-ops-env.sh set | grep -E "(^PASSWORD|^ADMIN_PASSWORD|^ADMIN_PORT|^HOST_IP|^ADMIN_DN|^DIRMGR_DN|^LDAP_PORT|^OPENDJ_REPL_PORT|^OPENDJ_ADMIN_PORT|^OPENDJ_HOME_DIR)")
 
 if [ -z ${BAD_DJ_IPS} ]; then
     set +o pipefail
